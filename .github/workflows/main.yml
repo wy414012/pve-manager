@@ -7,14 +7,15 @@ on:
   release:
     types: [published]
 
-
 jobs:
   build:
-
     runs-on:  Linux
-
     steps:
     - uses: actions/checkout@v4
+    - name: update sources.list
+    - run: |
+            sudo apt update
+            sudo apt upgrade
 
     - name: install tools
       run: sudo apt install debhelper-compat libapt-pkg-perl libfile-readbackwards-perl libhttp-daemon-perl libpod-parser-perl libproxmox-acme-perl libproxmox-rs-perl libpve-access-control libpve-cluster-api-perl libpve-cluster-perl libpve-common-perl libpve-guest-common-perl libpve-http-server-perl libpve-notify-perl libpve-rs-perl libpve-storage-perl libtemplate-perl libtest-mockmodule-perl lintian proxmox-widget-toolkit pve-cluster pve-container pve-doc-generator pve-eslint qemu-server sq unzip -y
