@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: update sources.list
-    - run: |
+      run: |
             sudo apt update
             sudo apt upgrade
 
