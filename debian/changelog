@@ -4,6 +4,8 @@ pve-manager (8.2.5-2) bookworm; urgency=medium
 
   * 修正NVME传感器监控
 
+  * 初步通配传感器，将版本号增加1
+
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 20 Sep 2024 02:10:43 +0800
 
 pve-manager (8.2.5-1) bookworm; urgency=medium

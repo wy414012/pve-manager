@@ -164,7 +164,7 @@ Ext.define('PVE.node.StatusView', {
         for (const sensorKey in sensorData) {
             if (sensorKey.startsWith('nct')) { // 检查键是否以nct开头
         // 假设我们只关心fan1和fan2，但可以根据需要添加更多
-        for (const fanNumber of ['1', '2', '3', '4', '5', '6']) { // 可以根据需要扩展
+        for (const fanNumber of ['1', '2', '3', '4', '5', '6', '7', '8']) { // 可以根据需要扩展
                     const fanKey = `fan${fanNumber}`;
                     const fanInfo = sensorData[sensorKey][fanKey];
                     if (
@@ -174,7 +174,7 @@ Ext.define('PVE.node.StatusView', {
                         // 假设风扇转速以RPM为单位，并四舍五入到整数
                         const fanSpeed = Math.round(fanInfo[`fan${fanNumber}_input`]);
                         if (fanSpeed > 0) { // 通常风扇转速不会是0或负数
-                            fanSpeeds.push(`Fan${fanNumber} (${sensorKey}):${fanSpeed} RPM`);
+                            fanSpeeds.push(`Fan${fanNumber} :${fanSpeed} RPM`);
                         }
                     }
         }
@@ -201,39 +201,53 @@ Ext.define('PVE.node.StatusView', {
     },
     },
     {
-        itemId: 'sensinfo2',
-        colspan: 2,
-        printBar: false,
-        title: gettext('NVME温度'),
-        textField: 'sensinfo',
-        renderer: function(value) {
+    itemId: 'sensinfo2',
+    colspan: 2,
+    printBar: false,
+    title: gettext('NVME温度'),
+    textField: 'sensinfo',
+    renderer: function(value) {
         // 去除可能存在的非ASCII字符
         const cleanedValue = value.replace(/[\x80-\xFF]/g, '');
         const temperatures = JSON.parse(cleanedValue);
-        // 确保可以访问temperatures对象，并且每个tempX_input都是数字
+
+        // 存储所有NVME适配器的温度
         const nvmeTemps = [];
-        // 假设您只关心"nvme-pci-0100"这个特定的NVME适配器
-        if (temperatures['nvme-pci-0100']) {
-            // 检查Composite和其他可能的传感器
-            const sensorKeys = Object.keys(temperatures['nvme-pci-0100']);
-            for (const sensorKey of sensorKeys) {
-                const sensor = temperatures['nvme-pci-0100'][sensorKey];
-                // 假设每个传感器都有一个tempX_input字段
-                for (let i = 1; i <= 3; i++) {
-                    // 假设最多有3个tempX_input，可按照实际增加删除
-                    const tempKey = `temp${i}_input`;
-                    if (sensor[tempKey] && !isNaN(parseFloat(sensor[tempKey]))) {
-                        nvmeTemps.push(parseFloat(sensor[tempKey]).toFixed(1) + '℃');
+
+        // 遍历所有以'nvme'开头的键
+        for (const adapterKey in temperatures) {
+            if (adapterKey.startsWith('nvme')) {
+                const sensorData = temperatures[adapterKey];
+                const adapterTemps = [];
+
+                // 检查Composite和其他可能的传感器
+                const sensorKeys = Object.keys(sensorData);
+                for (const sensorKey of sensorKeys) {
+                    const sensor = sensorData[sensorKey];
+
+                    // 假设温度数据存储在类似tempX_input的字段中，其中X是数字
+                    for (let i = 1; i <= 10; i++) { // 假设最多有10个温度值，可根据实际情况调整
+                        const tempKey = `temp${i}_input`;
+                        if (sensor[tempKey] && !isNaN(parseFloat(sensor[tempKey]))) {
+                            adapterTemps.push(parseFloat(sensor[tempKey]).toFixed(1) + '℃');
+                        }
                     }
+                }
+
+                // 如果该适配器有温度数据，则添加到总列表中
+                if (adapterTemps.length > 0) {
+                    nvmeTemps.push(`${adapterKey}: ${adapterTemps.join(' | ')}`);
                 }
             }
         }
-        // 如果nvmeTemps数组为空，则返回一个默认的字符串（可选）
+
+        // 如果没有找到任何NVME适配器的温度数据，则返回一个默认的字符串
         if (nvmeTemps.length === 0) {
             return '没有可用的NVME温度数据';
         }
-        // 否则，返回连接后的温度字符串
-        return `${nvmeTemps.join(' | ')}`;
+
+        // 返回所有NVME适配器的温度字符串，用换行符分隔
+        return nvmeTemps.join('|');
     },
     },
     {
