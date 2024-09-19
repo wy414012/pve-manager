@@ -160,33 +160,33 @@ Ext.define('PVE.node.StatusView', {
         const sensorData = JSON.parse(cleanedValue);
         // 初始化风扇转速数组
         const fanSpeeds = [];
-        // 遍历所有nct*前缀的传感器数据  
-        for (const sensorKey in sensorData) {  
-            if (sensorKey.startsWith('nct')) { // 检查键是否以nct开头  
+        // 遍历所有nct*前缀的传感器数据
+        for (const sensorKey in sensorData) {
+            if (sensorKey.startsWith('nct')) { // 检查键是否以nct开头
         // 假设我们只关心fan1和fan2，但可以根据需要添加更多
-        for (const fanNumber of ['1', '2', '3', '4', '5', '6']){ // 可以根据需要扩展  
-                    const fanKey = `fan${fanNumber}`;  
-                    const fanInfo = sensorData[sensorKey][fanKey];  
-                    if (  
-                        fanInfo && // 确保 fanInfo 存在且非假值  
-                        fanInfo[`fan${fanNumber}_input`] !== 0 // 检查对应键的值不是 0  
-                    ) {  
-                        // 假设风扇转速以RPM为单位，并四舍五入到整数  
-                        const fanSpeed = Math.round(fanInfo[`fan${fanNumber}_input`]);  
-                        if (fanSpeed > 0) { // 通常风扇转速不会是0或负数  
-                            fanSpeeds.push(`Fan${fanNumber} (${sensorKey}):${fanSpeed} RPM`);  
-                        } 
+        for (const fanNumber of ['1', '2', '3', '4', '5', '6']) { // 可以根据需要扩展
+                    const fanKey = `fan${fanNumber}`;
+                    const fanInfo = sensorData[sensorKey][fanKey];
+                    if (
+                        fanInfo && // 确保 fanInfo 存在且非假值
+                        fanInfo[`fan${fanNumber}_input`] !== 0 // 检查对应键的值不是 0
+                    ) {
+                        // 假设风扇转速以RPM为单位，并四舍五入到整数
+                        const fanSpeed = Math.round(fanInfo[`fan${fanNumber}_input`]);
+                        if (fanSpeed > 0) { // 通常风扇转速不会是0或负数
+                            fanSpeeds.push(`Fan${fanNumber} (${sensorKey}):${fanSpeed} RPM`);
+                        }
                     }
         }
             }
         }
-        // 如果fanSpeeds数组为空，则返回一个默认的字符串  
-        if (fanSpeeds.length === 0) {  
-            return '没有可用的风扇转速数据';  
-        }  
-  
-        // 否则，返回连接后的风扇转速字符串  
-        return `${fanSpeeds.join(' | ')}`;  
+        // 如果fanSpeeds数组为空，则返回一个默认的字符串
+        if (fanSpeeds.length === 0) {
+            return '没有可用的风扇转速数据';
+        }
+
+        // 否则，返回连接后的风扇转速字符串
+        return `${fanSpeeds.join(' | ')}`;
     },
     },
     {
