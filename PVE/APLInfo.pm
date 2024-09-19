@@ -196,13 +196,13 @@ sub download_aplinfo {
 sub get_apl_sources {
     my $sources = [
 	{
-	    host => "download.proxmox.com",
-	    url => "http://download.proxmox.com/images",
+	    host => "mirrors.ustc.edu.cn",
+	    url => "https://mirrors.ustc.edu.cn/proxmox/images",
 	    file => 'aplinfo-pve-8.dat',
 	},
 	{
-	    host => "releases.turnkeylinux.org",
-	    url => "https://releases.turnkeylinux.org/pve",
+	    host => "mirrors.ustc.edu.cn",
+	    url => "https://mirrors.ustc.edu.cn/turnkeylinux/metadata/pve",
 	    file => 'aplinfo.dat',
 	},
     ];
