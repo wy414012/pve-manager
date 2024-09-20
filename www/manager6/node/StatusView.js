@@ -117,37 +117,58 @@ Ext.define('PVE.node.StatusView', {
     },
     },
     {
-        itemId: 'sensinfo',
-        colspan: 2,
-        printBar: false,
-        title: gettext('CPU温度'),
-        textField: 'sensinfo',
-        renderer: function(value) {// 去除可能存在的非ASCII字符
-        const cleanedValue = value.replace(/[\x80-\xFF]/g, '');
-        const temperatures = JSON.parse(cleanedValue);// 确保可以访问temperatures对象，并且每个tempX_input都是数字
-        const cpu1Temps = [];
-        const coreTempPrefix = 'coretemp-isa-0000';// 先处理 "Package id 0" 的温度
-        const packageTemp = temperatures[coreTempPrefix]['Package id 0']?.temp1_input;
-        if (packageTemp && !isNaN(parseFloat(packageTemp))) {
-            cpu1Temps.push(`${parseFloat(packageTemp).toFixed(1)}℃`);
-        }
-        for (let i = 0; i <= 15; i++) {
-            const tempKey = `temp${i + 2}_input`;// 因为从temp2_input开始，所以i+2
-            const tempValue = temperatures[coreTempPrefix][`Core ${i}`]?.[tempKey];
-            if (tempValue && !isNaN(parseFloat(tempValue))) {
-                cpu1Temps.push(`${parseFloat(tempValue).toFixed(1)}℃`);
+    itemId: 'sensinfo',
+    colspan: 2,
+    printBar: false,
+    title: gettext('CPU温度'),
+    textField: 'sensinfo',
+    renderer: function(value) {
+        try {
+            const cleanedValue = value.replace(/[\x80-\xFF]/g, '');
+            const temperatures = JSON.parse(cleanedValue);
+
+            const cpuTemps = [];
+
+            // 遍历temperatures对象中的所有键，寻找以'coretemp-isa-'开头的键
+            for (const key in temperatures) {
+                if (key.startsWith('coretemp-isa-')) {
+                    const coreTempData = temperatures[key];
+
+                    // 处理"Package id X"的温度
+                    for (const packageIdKey in coreTempData) {
+                        if (packageIdKey.startsWith('Package id ')) {
+                            const packageId = packageIdKey.split(' ')[2]; // 提取Package id的数字部分
+                            const packageTemp = coreTempData[packageIdKey]?.temp1_input;
+                            if (packageTemp && !isNaN(parseFloat(packageTemp))) {
+                                cpuTemps.push(`Package ${packageId}: ${parseFloat(packageTemp).toFixed(1)}℃`);
+                            }
+                        }
+                    }
+
+                    // 处理核心温度
+                    for (let i = 0; i <= 64; i++) { // 假设最多64个核心，根据实际情况调整
+                        const coreKey = `Core ${i}`;
+                        const tempKey = `temp${i + 2}_input`;
+                        const tempValue = coreTempData[coreKey]?.[tempKey];
+                        if (tempValue && !isNaN(parseFloat(tempValue))) {
+                            cpuTemps.push(`${coreKey}: ${parseFloat(tempValue).toFixed(1)}℃`);
+                        }
+                    }
+                }
             }
+
+            if (cpuTemps.length === 0) {
+                return '没有可用的核心温度数据';
+            }
+
+            // 返回连接后的温度字符串
+            return `${cpuTemps.join(' | ')}`;
+        } catch (error) {
+            console.error('处理CPU温度数据时发生错误:', error);
+            return '无法获取CPU温度数据（解析错误）';
         }
-        // 使用filter方法过滤掉'N/A'（在这个例子中，我们其实没有添加'N/A'，因为只有当tempValue是数字时才添加)
-        // 但如果你想添加逻辑来显式处理'N/A'的情况，可以在这里进行
-        // 如果cpu1Temps数组为空，则返回一个默认的字符串（可选）
-        if (cpu1Temps.length === 0) {
-            return '没有可用的核心温度数据';
-        }
-        // 否则，返回连接后的温度字符串
-        return `${cpu1Temps.join(' | ')}`;
-    },
-    },
+	},
+	},
     {
     itemId: 'sensinfo1',
     colspan: 2,
