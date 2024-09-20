@@ -170,6 +170,46 @@ Ext.define('PVE.node.StatusView', {
 	},
 	},
     {
+    itemId: 'mainboardTemp',
+    colspan: 2,
+    printBar: false,
+    title: gettext('主板温度'),
+    textField: 'sensinfo', // 注意这里可能需要根据实际情况调整，因为原始数据可能来自不同来源
+    renderer: function(value) {
+        try {
+            const cleanedValue = value.replace(/[\x80-\xFF]/g, '');
+            const temperatures = JSON.parse(cleanedValue);
+
+            let mainboardTemp = null;
+
+            // 遍历temperatures对象，寻找所有'acpitz-acpi-*'键
+            for (const key in temperatures) {
+                if (key.startsWith('acpitz-acpi-')) {
+                    const acpitzData = temperatures[key];
+
+                    // 检查是否存在temp1并获取其值
+                    if (acpitzData.temp1 && acpitzData.temp1.temp1_input) {
+                        const temp = parseFloat(acpitzData.temp1.temp1_input).toFixed(1);
+                        if (!isNaN(temp)) {
+                            mainboardTemp = `${temp}℃`;
+                            break; // 找到第一个有效温度后就退出循环
+                        }
+                    }
+                }
+            }
+
+            if (mainboardTemp === null) {
+                return '没有可用的主板温度数据';
+            }
+
+            return mainboardTemp;
+        } catch (error) {
+            console.error('处理主板温度数据时发生错误:', error);
+            return '无法获取主板温度数据（解析错误）';
+        }
+    },
+    },
+    {
     itemId: 'sensinfo1',
     colspan: 2,
     printBar: false,
