@@ -45,7 +45,7 @@ a)查看本机支持模式
 
 ```shell
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
-```shell
+```
 
 b)查看当前性能模式
 
