@@ -10,6 +10,8 @@ pve-manager (8.2.5-2) bookworm; urgency=medium
 
   * 解决因传感器返回空值时候导致界面显示连接中的bug
 
+  * 调整组件大小，给增加行列留出显示空间
+
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 20 Sep 2024 15:10:21 +0800
 
 pve-manager (8.2.5-1) bookworm; urgency=medium
