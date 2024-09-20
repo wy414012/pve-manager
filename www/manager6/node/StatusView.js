@@ -161,9 +161,9 @@ Ext.define('PVE.node.StatusView', {
         // 初始化风扇转速数组
         const fanSpeeds = [];
         // 遍历所有nct*前缀的传感器数据
-        for (const sensorKey in sensorData) {
+         for (const sensorKey in sensorData) {
             if (sensorKey.startsWith('nct')) { // 检查键是否以nct开头
-        // 假设我们只关心fan1和fan2，但可以根据需要添加更多
+        // 这里我们不用遍历，采取硬编码，硬件中不会超过10个风扇数据所以不需要遍历
         for (const fanNumber of ['1', '2', '3', '4', '5', '6', '7', '8']) { // 可以根据需要扩展
                     const fanKey = `fan${fanNumber}`;
                     const fanInfo = sensorData[sensorKey][fanKey];
@@ -177,7 +177,7 @@ Ext.define('PVE.node.StatusView', {
                             fanSpeeds.push(`Fan${fanNumber} :${fanSpeed} RPM`);
                         }
                     }
-        }
+		}
             }
         }
         // 如果fanSpeeds数组为空，则返回一个默认的字符串
