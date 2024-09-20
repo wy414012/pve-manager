@@ -24,27 +24,35 @@ sensors -j  验证配置后的输出
 3、功耗：
 
 a) 第一步，安装cpupower工具
+
 ```shell
 apt install linux-cpupower
 ```
 b) 安装完成后，修改一下turbostat的执行权限
+
 ```shell
 chmod +s /usr/sbin/turbostat
 ```
+
 c) 解决重启后不生效
+
 ```shell
 echo msr > /etc/modules-load.d/turbostat.conf
 ```
 4、电源模式配置
 
 a)查看本机支持模式
+
 ```shell
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
 ```shell
-b)、查看当前性能模式
+
+b)查看当前性能模式
+
 ```shell
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 ```
+
 c)设置电源模式可选，使用我们查看到支持的模式
 
 | 电源模式 | 解释说明 |  
