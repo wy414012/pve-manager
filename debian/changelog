@@ -12,7 +12,9 @@ pve-manager (8.2.5-2) bookworm; urgency=medium
 
   * 调整组件大小，给增加行列留出显示空间
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 20 Sep 2024 15:10:21 +0800
+  * 修复容器模板源加载问题，lxc源调整到中科大
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 20 Sep 2024 18:28:11 +0800
 
 pve-manager (8.2.5-1) bookworm; urgency=medium
 
