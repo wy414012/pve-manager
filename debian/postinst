@@ -149,9 +149,9 @@ case "$1" in
 
     mkdir /etc/pve 2>/dev/null || true
 
-    if test ! -e /var/lib/pve-manager/apl-info/download.proxmox.com; then
+    if test ! -e /var/lib/pve-manager/apl-info/mirrors.ustc.edu.cn; then
         mkdir -p /var/lib/pve-manager/apl-info
-        cp /usr/share/doc/pve-manager/aplinfo.dat /var/lib/pve-manager/apl-info/download.proxmox.com
+        cp /usr/share/doc/pve-manager/aplinfo.dat /var/lib/pve-manager/apl-info/mirrors.ustc.edu.cn
         pveam update || true
     fi
 

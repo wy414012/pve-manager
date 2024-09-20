@@ -17,7 +17,7 @@ install: aplinfo.dat trustedkeys.gpg
 .PHONY: update
 update:
 	rm -f aplinfo.dat
-	wget http://download.proxmox.com/images/aplinfo-pve-8.dat -O aplinfo.dat.tmp
+	wget https://mirrors.ustc.edu.cn/proxmox/images/aplinfo-pve-8.dat -O aplinfo.dat.tmp
 	mv aplinfo.dat.tmp aplinfo.dat
 
 trustedkeys.gpg: $(TRUSTED_KEYS)
