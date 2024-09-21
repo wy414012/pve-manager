@@ -16,7 +16,9 @@ pve-manager (8.2.6-1) bookworm; urgency=medium
 
   * 更改：调整工作流中安装的软件包，使其在无环境设备中，成功构建该deb
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 17:36:43 +0800
+  * 更改：调整版本控制哈希为7字符显示，同步GitHub显示
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 20:42:25 +0800
 
 pve-manager (8.2.5-2) bookworm; urgency=medium
 

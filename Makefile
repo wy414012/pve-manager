@@ -21,7 +21,7 @@ check: bin test www
 	$(MAKE) -C test check
 	$(MAKE) -C www check
 
-GITVERSION:=$(shell git rev-parse --short=16 HEAD)
+GITVERSION:=$(shell git rev-parse --short=7 HEAD)
 $(BUILDDIR):
 	rm -rf $@ $@.tmp
 	mkdir $@.tmp
