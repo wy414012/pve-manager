@@ -1,8 +1,10 @@
 pve-manager (8.2.6-1) bookworm; urgency=medium
 
-  * 合并主库,同步更新版本号为8.2.61
+  * 合并主库,同步更新版本号为8.2.6-1
+ 
+  * 添加依赖检查
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 11:09:59 +0800
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 11:53:03 +0800
 
 pve-manager (8.2.5-2) bookworm; urgency=medium
 
