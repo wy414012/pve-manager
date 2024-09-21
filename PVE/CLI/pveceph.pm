@@ -135,7 +135,7 @@ __PACKAGE__->register_method ({
 	    repository => {
 		type => 'string',
 		enum => ['enterprise', 'no-subscription', 'test'],
-		default => 'enterprise',
+		default => 'no-subscription',
 		description => "Ceph repository to use.",
 		optional => 1,
 	    },
@@ -153,9 +153,9 @@ __PACKAGE__->register_method ({
 
 	my $cephver = $param->{version} || $default_ceph_version;
 
-	my $repo = $param->{'repository'} // 'enterprise';
+	my $repo = $param->{'repository'} // 'no-subscription';
 	my $enterprise_repo = $repo eq 'enterprise';
-	my $cdn = $enterprise_repo ? 'https://enterprise.proxmox.com' : 'http://download.proxmox.com';
+	my $cdn = $enterprise_repo ? 'https://enterprise.proxmox.com' : 'https://mirrors.ustc.edu.cn/proxmox';
 
 	if (has_valid_subscription()) {
 	    warn "\nNOTE: The node has an active subscription but a non-production Ceph repository selected.\n\n"

@@ -149,12 +149,17 @@ case "$1" in
 
     mkdir /etc/pve 2>/dev/null || true
 
-    if test ! -e /var/lib/pve-manager/apl-info/mirrors.ustc.edu.cn; then
-        mkdir -p /var/lib/pve-manager/apl-info
-        cp /usr/share/doc/pve-manager/aplinfo.dat /var/lib/pve-manager/apl-info/mirrors.ustc.edu.cn
+    mkdir -p /var/lib/pve-manager/apl-info
+
+    if test ! -e /var/lib/pve-manager/apl-info/host1; then
+        cp /usr/share/doc/pve-manager/aplinfo-pve-8.dat /var/lib/pve-manager/apl-info/host1
         pveam update || true
     fi
 
+        if test ! -e /var/lib/pve-manager/apl-info/host2; then
+        cp /usr/share/doc/pve-manager/aplinfo.dat /var/lib/pve-manager/apl-info/host2        
+        pveam update || true
+    fi
     # Always try to clean old entry, even when proxmox-mail-forward entry is already present.
     # This ensures it will still be cleaned after an upgrade following a downgrade.
     if test -f /root/.forward; then
