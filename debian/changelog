@@ -4,7 +4,9 @@ pve-manager (8.2.2-2) bookworm; urgency=medium
 
   * 更改：将窗体显示调整为700px，等于状态窗体340+5+5+10+340
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 15:46:13 +0800
+  * 更改：将版本哈希控制为7字符，同步GitHub显示
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 20:34:43 +0800
 
 pve-manager (8.2.2-1) bookworm; urgency=medium
 
