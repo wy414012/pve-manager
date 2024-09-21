@@ -482,6 +482,11 @@ __PACKAGE__->register_method({
 	    total => $meminfo->{swaptotal},
 	    used => $meminfo->{swapused},
 	};
+	$res->{sensinfo} = `sensors -j`;
+
+	$res->{cpure} = `cat /proc/cpuinfo | grep -i "cpu mhz"`;
+
+	$res->{cpu_tdp} = `turbostat --quiet --cpu package --show "PkgWatt" -S sleep 0.25 2>&1 | tail -n1`; 
 
 	$res->{pveversion} = PVE::pvecfg::package() . "/" .
 	    PVE::pvecfg::version_text();

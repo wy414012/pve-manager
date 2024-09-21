@@ -1,3 +1,17 @@
+pve-manager (8.2.2-1) bookworm; urgency=medium
+
+  * 更改: 为稳定的发行版创建的温度监控等显示
+  
+  * 更改：添加系统依赖检查
+
+  * 更改：切换lxc源为中科大源
+
+  * 更改：切换默认镜像源为中科大源
+
+  * 添加：创建CI工作流
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 12:56:26 +0800
+
 pve-manager (8.2.2) bookworm; urgency=medium
 
   * ui: fix form-reset behavior of backup job editor

@@ -1,1 +1,1 @@
-deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise
+deb https://mirrors.ustc.edu.cn/proxmox/debian/pve bookworm pve-no-subscription

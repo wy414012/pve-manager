@@ -39,7 +39,7 @@ Ext.define('PVE.Login', {
 			    params: {
 				username: ticketResponse.username,
 				'tfa-challenge': ticketResponse.ticket,
-				password: `totp:${code}`
+				password: `totp:${code}`,
 			    },
 			    method: 'POST',
 			    timeout: 5000, // it'll delay both success & failure
