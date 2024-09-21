@@ -1,3 +1,9 @@
+pve-manager (8.2.2-2) bookworm; urgency=medium
+
+  * 更改: 将ceph源，默认调整为非企业源，切换到中科大
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 21 Sep 2024 15:46:13 +0800
+
 pve-manager (8.2.2-1) bookworm; urgency=medium
 
   * 更改: 为稳定的发行版创建的温度监控等显示
