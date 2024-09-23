@@ -585,6 +585,13 @@ utilities: {
 	    Proxmox.Utils.task_desc_table[key] = value;
 	}
     },
+    overrideNotificationFieldName: function(extra) {
+	// do nothing, we don't have notification configuration in mobile ui
+    },
+
+    overrideNotificationFieldValue: function(extra) {
+	// do nothing, we don't have notification configuration in mobile ui
+    },
 
     format_task_description: function(type, id) {
 	let farray = Proxmox.Utils.task_desc_table[type];
