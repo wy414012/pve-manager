@@ -912,6 +912,7 @@ __PACKAGE__->register_method({
 	check => ['perm', '/nodes/{node}', [ 'Sys.Syslog' ]],
     },
     protected => 1,
+    download_allowed => 1,
     parameters => {
 	additionalProperties => 0,
 	properties => {

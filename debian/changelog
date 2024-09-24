@@ -1,3 +1,10 @@
+pve-manager (8.2.7-1) bookworm; urgency=medium
+
+  * 同步：合并主库,同步更新版本号为8.2.7-1
+
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 24 Sep 2024 10:56:37 +0800
+
 pve-manager (8.2.6-1) bookworm; urgency=medium
 
   * 同步：合并主库,同步更新版本号为8.2.6-1
@@ -51,7 +58,17 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
- 
+
+
+pve-manager (8.2.7) bookworm; urgency=medium
+
+  * api: add missing schema annotations for download endpoints and adapt
+    existing ones to renaming the respective property to 'download_allowed'.
+
+  * pvesh: limit download handling to annotated endpoints to unify the
+    behaviour with pve-http-server.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 23 Sep 2024 11:43:24 +0200
 
 pve-manager (8.2.6) bookworm; urgency=medium
 
