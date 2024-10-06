@@ -22,6 +22,7 @@ use PVE::SafeSyslog;
 use PVE::Storage;
 use PVE::Tools;
 
+use PVE::Ceph::Releases;
 use PVE::API2Tools;
 
 use base qw(PVE::RESTHandler);
@@ -94,12 +95,11 @@ sub write_etc_subscription {
         $filename, "/etc/apt/auth.conf.d/pve.conf", "enterprise.proxmox.com/debian/pve", $info);
 
     if (!(defined($info->{key}) && defined($info->{serverid}))) {
-	unlink "/etc/apt/auth.conf.d/ceph.conf";
+	unlink "/etc/apt/auth.conf.d/ceph.conf" or $!{ENOENT} or die "failed to remove apt auth ceph.conf - $!";
     } else {
-	# FIXME: improve this, especially the selection of valid ceph-releases
-	# NOTE: currently we should add future ceph releases as early as possible, to ensure that
+	my $supported_ceph_releases = PVE::Ceph::Releases::get_available_ceph_release_codenames(1);
 	my $ceph_auth = '';
-	for my $ceph_release ('quincy', 'reef') {
+	for my $ceph_release ($supported_ceph_releases->@*) {
 	    $ceph_auth .= "machine enterprise.proxmox.com/debian/ceph-${ceph_release}"
 	    ." login $info->{key} password $info->{serverid}\n"
 	}
