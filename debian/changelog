@@ -1,3 +1,9 @@
+pve-manager (8.2.2-3) bookworm; urgency=medium
+
+  * 更改: 添加i2c驱动的旧版传感器支持
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Mon, 07 Oct 2024 19:52:05 +0800
+
 pve-manager (8.2.2-2) bookworm; urgency=medium
 
   * 更改: 将ceph源，默认调整为非企业源，切换到中科大
