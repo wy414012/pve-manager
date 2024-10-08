@@ -21,6 +21,20 @@ jobs:
     - name: run make
       run: make deb
 
+    - name: set key
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.GIT_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        echo "StrictHostKeyChecking no" >> ~/.ssh/config
+        
+    - name: Push Web server
+      env:
+        SECRET_CHECK_SCRIPT_URL: ${{ secrets.SECRET_CHECK_SCRIPT_URL }}
+      run: rsync -avz ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
+        
     - name: upload artifact
       uses: actions/upload-artifact@v4
       with:
