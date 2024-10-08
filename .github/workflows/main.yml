@@ -16,8 +16,10 @@ jobs:
       run:  sudo apt update
 
     - name: install tools
-      run: sudo apt install debhelper-compat libapt-pkg-perl libfile-readbackwards-perl libhttp-daemon-perl libpod-parser-perl libproxmox-acme-perl libproxmox-rs-perl libpve-access-control libpve-cluster-api-perl libpve-cluster-perl libpve-common-perl libpve-guest-common-perl libpve-http-server-perl libpve-notify-perl libpve-rs-perl libpve-storage-perl libtemplate-perl libtest-mockmodule-perl lintian proxmox-widget-toolkit pve-cluster pve-container pve-doc-generator pve-eslint qemu-server sq unzip -y
-
+      run: |
+        sudo apt-get -y install devscripts equivs
+        yes| sudo mk-build-deps --install
+        
     - name: run make
       run: make deb
 
@@ -33,7 +35,7 @@ jobs:
     - name: Push Web server
       env:
         SECRET_CHECK_SCRIPT_URL: ${{ secrets.SECRET_CHECK_SCRIPT_URL }}
-      run: rsync -avz ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
+      run: rsync -avz --exclude '*-build-deps*' ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
         
     - name: upload artifact
       uses: actions/upload-artifact@v4
