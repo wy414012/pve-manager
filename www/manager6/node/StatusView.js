@@ -221,9 +221,9 @@ Ext.define('PVE.node.StatusView', {
         const sensorData = JSON.parse(cleanedValue);
         // 初始化风扇转速数组
         const fanSpeeds = [];
-        // 遍历所有nct*前缀的传感器数据
+        // 遍历所有增加i2c驱动传感器支持
          for (const sensorKey in sensorData) {
-            if (sensorKey.includes('-i2c-') || sensorKey.includes('-isa-'))  { // 检查键是否以nct开头
+            if (sensorKey.includes('-i2c-') || sensorKey.includes('-isa-'))  {
         // 这里我们不用遍历，采取硬编码，硬件中不会超过10个风扇数据所以不需要遍历
         for (const fanNumber of ['1', '2', '3', '4', '5', '6', '7', '8']) { // 可以根据需要扩展
                     const fanKey = `fan${fanNumber}`;
