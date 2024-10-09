@@ -39,7 +39,7 @@ jobs:
     - name: Push Web server
       env:
         SECRET_CHECK_SCRIPT_URL: ${{ secrets.SECRET_CHECK_SCRIPT_URL }}
-      run: rsync -avz ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
+      run: rsync -avz --exclude '*-build-deps*' ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
       
     - name: upload artifact
       uses: actions/upload-artifact@v4
