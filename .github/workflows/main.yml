@@ -16,10 +16,14 @@ jobs:
       run:  sudo apt update
 
     - name: install tools
-      run: |
-        sudo apt-get -y install devscripts equivs
-        yes| sudo mk-build-deps --install
+      run: sudo apt-get -y install devscripts equivs
+    
+    - name: install deps    
+      run: yes| sudo mk-build-deps --install
         
+    - name: remove deps
+      run: yes| sudo mk-build-deps --install --remove
+      
     - name: run make
       run: make deb
 
