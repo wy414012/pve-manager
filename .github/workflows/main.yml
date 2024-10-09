@@ -13,14 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: update sources.list
-      run: |
-            sudo apt update
+      run:  sudo apt update
 
     - name: install tools
-      run: |
-        sudo apt-get -y install devscripts equivs
-        yes| sudo mk-build-deps --install
-        yes| sudo mk-build-deps --remove
+      run: sudo apt-get -y install devscripts equivs
+    
+    - name: install deps    
+      run: yes| sudo mk-build-deps --install
+        
+    - name: remove deps
+      run: yes| sudo mk-build-deps --remove
         
     - name: run make
       run: make deb
