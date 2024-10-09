@@ -22,7 +22,7 @@ jobs:
       run: yes| sudo mk-build-deps --install
         
     - name: remove deps
-      run: yes| sudo mk-build-deps --remove
+      run: yes| sudo mk-build-deps --install --remove
         
     - name: run make
       run: make deb
