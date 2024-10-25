@@ -1,3 +1,35 @@
+pve-manager (8.2.8-1) bookworm; urgency=medium
+
+  * 同步：合并主库,同步更新版本号为8.2.8-1
+  
+  * 修复#5734：为移动UI提供Proxmox.Utils中缺失的方法
+  
+  * API：订阅更新：如果删除ceph-auth文件失败，则报告错误
+  
+  * 添加模块以集中跟踪后端Ceph版本信息
+  
+  * pveceph：在TTY上提示用户安装实验版本
+
+  * Ceph版本：添加19.2 Squid作为可用版本，目前仍为技术预览版
+
+  * 修复#5753：API：在任务状态返回架构中添加'pstart'成员
+
+  * 修复#5302：UI：在硬件概览中显示虚拟机CPU亲和性
+
+  * 修正用户可见字符串中的拼写错误
+
+  * 修复#5632：UI：存储：更正备份视图的在线帮助链接
+
+  * UI：Ceph向导：为处于技术预览状态的版本显示提示
+
+  * UI：Ceph向导：为技术预览版本过滤掉企业存储库
+
+  * UI：Ceph向导：添加可安装的Ceph 19.2 Squid版本
+
+  * API：改进多个API调用的API JSON架构
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 25 Oct 2024 10:59:58 +0800
+
 pve-manager (8.2.7-1) bookworm; urgency=medium
 
   * 同步：合并主库,同步更新版本号为8.2.7-1
@@ -58,6 +90,37 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+
+pve-manager (8.2.8) bookworm; urgency=medium
+
+  * fix #5734: provide missing methods for Proxmox.Utils for mobile UI
+
+  * api: subscription update: report error if removing ceph-auth file fails
+
+  * add module to centrally track Ceph release info for the backend
+
+  * pveceph: prompt user on TTY about installing experimental version
+
+  * ceph releases: add 19.2 Squid as available release, currently still as
+    technology preview
+
+  * fix #5753: api: add 'pstart' member to task status return schema
+
+  * fix #5302: ui: vm cpu affinity displayed in hardware overview
+
+  * fix typos in user visible strings
+
+  * fix #5632: ui:storage: correct online help link of backup view
+
+  * ui: ceph wizard: show hint for releases that are in tech-preview state
+
+  * ui: ceph wizard: filter out enterprise repo for tech-preview releases
+
+  * ui: ceph wizard: add Ceph 19.2 Squid as installable release
+
+  * api: improve the API JSON schema of various API calls
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 24 Oct 2024 16:47:02 +0200
 
 
 pve-manager (8.2.7) bookworm; urgency=medium

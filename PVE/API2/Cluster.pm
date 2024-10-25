@@ -295,13 +295,27 @@ __PACKAGE__->register_method({
 		    optional => 1,
 		    renderer => 'bytes',
 		},
+		netin => {
+		    description => "The amount of traffic in bytes that was sent to the guest over"
+			." the network since it was started. (for type 'qemu' and 'lxc')",
+		    type => 'integer',
+		    optional => 1,
+		    renderer => 'bytes',
+		},
+		netout => {
+		    description => "The amount of traffic in bytes that was sent from the guest over"
+			." the network since it was started. (for type 'qemu' and 'lxc')",
+		    type => 'integer',
+		    optional => 1,
+		    renderer => 'bytes',
+		},
 		level => {
 		    description => "Support level (when type == node).",
 		    type => 'string',
 		    optional => 1,
 		},
 		uptime => {
-		    description => "Node uptime in seconds (when type in node,qemu,lxc).",
+		    description => "Uptime of node or virtual guest in seconds (when type in node,qemu,lxc).",
 		    type => 'integer',
 		    optional => 1,
 		    renderer => 'duration',
@@ -325,6 +339,22 @@ __PACKAGE__->register_method({
 		    renderer => 'bytes',
 		    minimum => 0,
 		},
+		diskread => {
+		    description => "The amount of bytes the guest read from it's block devices since"
+			." the guest was started. This info is not available for all storage types."
+			." (for type 'qemu' and 'lxc')",
+		    type => 'integer',
+		    optional => 1,
+		    renderer => 'bytes',
+		},
+		diskwrite => {
+		    description => "The amount of bytes the guest wrote to it's block devices since"
+			." the guest was started. This info is not available for all storage types."
+			." (for type 'qemu' and 'lxc')",
+		    type => 'integer',
+		    optional => 1,
+		    renderer => 'bytes',
+		},
 		content => {
 		    description => "Allowed storage content types (when type == storage).",
 		    type => 'string',
@@ -344,6 +374,12 @@ __PACKAGE__->register_method({
 		    description => "The cgroup mode the node operates under (when type == node).",
 		    type => 'integer',
 		    optional => 1,
+		},
+		template => {
+		    description => "Determines if the guest is a template. (type in qemu,lxc)",
+		    type => 'boolean',
+		    optional => 1,
+		    default => 0,
 		},
 	    },
 	},

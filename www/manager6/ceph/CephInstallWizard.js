@@ -51,6 +51,7 @@ Ext.define('PVE.ceph.CephVersionSelector', {
 	data: [
 	    { release: "quincy", version: "17.2" },
 	    { release: "reef", version: "18.2" },
+	    { release: "squid", version: "19.2", preview: true /* TODO: drop after stabilisation */ },
 	],
     },
 });
@@ -147,12 +148,13 @@ Ext.define('PVE.ceph.CephInstallWizard', {
     viewModel: {
 	data: {
 	    nodename: '',
-	    cephRelease: 'reef',
+	    cephRelease: 'reef', // default
 	    cephRepo: 'enterprise',
 	    configuration: true,
 	    isInstalled: false,
 	    nodeHasSubscription: true, // avoid warning hint until fully loaded
 	    allHaveSubscription: true, // avoid warning hint until fully loaded
+	    selectedReleaseIsTechPreview: false, // avoid warning hint until fully loaded
 	},
 	formulas: {
 	    repoHintHidden: get => get('allHaveSubscription') && get('cephRepo') === 'enterprise',
@@ -250,6 +252,17 @@ Ext.define('PVE.ceph.CephInstallWizard', {
 		    },
 		},
 		{
+		    xtype: 'displayfield',
+		    fieldLabel: gettext('Note'),
+		    labelClsExtra: 'pmx-hint',
+		    submitValue: false,
+		    labelWidth: 50,
+		    value: gettext('The selected release is currently considered a Technology Preview. Although we are not aware of any major issues, there may be some bugs and the Enterprise Repository is not yet available.'),
+		    bind: {
+			hidden: '{!selectedReleaseIsTechPreview}',
+		    },
+		},
+		{
 		    xtype: 'pveCephHighestVersionDisplay',
 		    labelWidth: 150,
 		    cbind: {
@@ -281,15 +294,28 @@ Ext.define('PVE.ceph.CephInstallWizard', {
 			},
 			listeners: {
 			    change: function(field, release) {
+				let me = this;
 				let wizard = this.up('pveCephInstallWizard');
 				wizard.down('#next').setText(
 				    Ext.String.format(gettext('Start {0} installation'), release),
 				);
+
+				let record = me.store.findRecord('release', release, 0, false, true, true);
+				let releaseIsTechPreview = !!record.data.preview;
+				wizard.getViewModel().set('selectedReleaseIsTechPreview', releaseIsTechPreview);
+
+				let repoSelector = wizard.down('#repoSelector');
+				if (releaseIsTechPreview) {
+				    repoSelector.store.filterBy(entry => entry.get('key') !== 'enterprise');
+				} else {
+				    repoSelector.store.clearFilter();
+				}
 			    },
 			},
 		    },
 		    {
 			xtype: 'proxmoxKVComboBox',
+			id: 'repoSelector', // TODO: use name or reference (how to lookup that here?)
 			fieldLabel: gettext('Repository'),
 			padding: '0 0 0 10',
 			comboItems: [
