@@ -52,9 +52,7 @@ Ext.define('PVE.qemu.CloudInit', {
 		    waitMsgTarget: view,
 		    method: 'PUT',
 		    params: params,
-		    failure: function(response, opts) {
-			Ext.Msg.alert('Error', response.htmlStatus);
-		    },
+		    failure: response => Ext.Msg.alert('Error', response.htmlStatus),
 		    callback: function() {
 			view.reload();
 		    },
@@ -82,38 +80,14 @@ Ext.define('PVE.qemu.CloudInit', {
 	    text: gettext('Regenerate Image'),
 	    handler: function() {
 		let view = this.up('grid');
-		var eject_params = {};
-		var insert_params = {};
-		let disk = PVE.Parser.parseQemuDrive(view.ciDriveId, view.ciDrive);
-		var storage = '';
-		var stormatch = disk.file.match(/^([^:]+):/);
-		if (stormatch) {
-		    storage = stormatch[1];
-		}
-		eject_params[view.ciDriveId] = 'none,media=cdrom';
-		insert_params[view.ciDriveId] = storage + ':cloudinit';
-
-		var failure = function(response, opts) {
-		    Ext.Msg.alert('Error', response.htmlStatus);
-		};
 
 		Proxmox.Utils.API2Request({
-		    url: view.baseurl + '/config',
+		    url: view.baseurl + '/cloudinit',
 		    waitMsgTarget: view,
 		    method: 'PUT',
-		    params: eject_params,
-		    failure: failure,
+		    failure: response => Ext.Msg.alert('Error', response.htmlStatus),
 		    callback: function() {
-			Proxmox.Utils.API2Request({
-			    url: view.baseurl + '/config',
-			    waitMsgTarget: view,
-			    method: 'PUT',
-			    params: insert_params,
-			    failure: failure,
-			    callback: function() {
-				view.reload();
-			    },
-			});
+			view.reload();
 		    },
 		});
 	    },
@@ -142,7 +116,10 @@ Ext.define('PVE.qemu.CloudInit', {
 		}
 	});
 
-	me.down('#savebtn').setDisabled(!found);
+	let caps = Ext.state.Manager.get('GuiCap');
+	let canRegenerateImage = !!caps.vms['VM.Config.Cloudinit'];
+	me.down('#savebtn').setDisabled(!found || !canRegenerateImage);
+
 	me.setDisabled(!found);
 	if (!found) {
 	    me.getView().mask(gettext('No CloudInit Drive found'), ['pve-static-mask']);
