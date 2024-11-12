@@ -46,6 +46,18 @@ Ext.define('PVE.tree.ResourceTree', {
     useArrows: true,
 
     // private
+    getTypeOrder: function(type) {
+	switch (type) {
+	    case 'lxc': return 0;
+	    case 'qemu': return 1;
+	    case 'node': return 2;
+	    case 'sdn': return 3;
+	    case 'storage': return 4;
+	    default: return 9;
+	}
+    },
+
+    // private
     nodeSortFn: function(node1, node2) {
 	let me = this;
 	let n1 = node1.data, n2 = node2.data;
@@ -55,10 +67,9 @@ Ext.define('PVE.tree.ResourceTree', {
 	    let n2IsGuest = n2.type === 'qemu' || n2.type === 'lxc';
 	    if (me['group-guest-types'] || !n1IsGuest || !n2IsGuest) {
 		// first sort (group) by type
-		if (n1.type > n2.type) {
-		    return 1;
-		} else if (n1.type < n2.type) {
-		    return -1;
+		let res = me.getTypeOrder(n1.type) - me.getTypeOrder(n2.type);
+		if (res !== 0) {
+		    return res;
 		}
 	    }
 
@@ -316,7 +327,7 @@ Ext.define('PVE.tree.ResourceTree', {
 
 	    // also check for name for when the tree is sorted by name
 	    let moveCheckAttrs = groups.concat(['node', 'template', 'name']);
-	    let filterfn = me.viewFilter.filterfn;
+	    let filterFn = me.viewFilter.getFilterFn ? me.viewFilter.getFilterFn() : Ext.identityFn;
 
 	    let reselect = false; // for disappeared nodes
 	    let index = pdata.dataIndex;
@@ -388,7 +399,7 @@ Ext.define('PVE.tree.ResourceTree', {
 		if (olditem) {
 		    return;
 		}
-		if (filterfn && !filterfn(item)) {
+		if (filterFn && !filterFn(item)) {
 		    return;
 		}
 		let info = Ext.apply({ leaf: true }, item.data);
