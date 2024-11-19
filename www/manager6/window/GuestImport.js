@@ -303,6 +303,7 @@ Ext.define('PVE.window.GuestImport', {
 	    os: 'l26',
 	    maxCdDrives: false,
 	    uniqueMACAdresses: false,
+	    isOva: false,
 	    warnings: [],
 	},
 
@@ -314,6 +315,8 @@ Ext.define('PVE.window.GuestImport', {
 	    liveImportNote: get => !get('liveImport') ? ''
 	        : gettext('Note: If anything goes wrong during the live-import, new data written by the VM may be lost.'),
 	    isWindows: get => (get('os') ?? '').startsWith('w'),
+	    liveImportText: get => get('isOva') ? gettext('Starts a VM and imports the disks in the background')
+		: gettext('Starts a previously stopped VM on Proxmox VE and imports the disks in the background.'),
 	},
     },
 
@@ -430,6 +433,10 @@ Ext.define('PVE.window.GuestImport', {
 			if (value === '__default__') {
 			    delete config[key];
 			}
+		    }
+
+		    if (config['import-working-storage'] === '') {
+			delete config['import-working-storage'];
 		    }
 
 		    return config;
@@ -553,6 +560,22 @@ Ext.define('PVE.window.GuestImport', {
 			allowBlank: false,
 			fieldLabel: gettext('Default Bridge'),
 		    },
+		    {
+			xtype: 'pveStorageSelector',
+			reference: 'extractionStorage',
+			fieldLabel: gettext('Import Working Storage'),
+			storageContent: 'images',
+			emptyText: gettext('Import Storage'),
+			autoSelect: false,
+			name: 'import-working-storage',
+			disabled: true,
+			hidden: true,
+			allowBlank: true,
+			bind: {
+			    disabled: '{!isOva}',
+			    hidden: '{!isOva}',
+			},
+		    },
 		],
 
 		columnB: [
@@ -561,9 +584,9 @@ Ext.define('PVE.window.GuestImport', {
 			fieldLabel: gettext('Live Import'),
 			reference: 'liveimport',
 			isFormField: false,
-			boxLabel: gettext('Starts a previously stopped VM on Proxmox VE and imports the disks in the background.'),
 			bind: {
 			    value: '{liveImport}',
+			    boxLabel: '{liveImportText}',
 			},
 		    },
 		    {
@@ -925,6 +948,7 @@ Ext.define('PVE.window.GuestImport', {
 
 	me.lookup('defaultStorage').setNodename(me.nodename);
 	me.lookup('defaultBridge').setNodename(me.nodename);
+	me.lookup('extractionStorage').setNodename(me.nodename);
 
 	let renderWarning = w => {
 	    const warningsCatalogue = {
@@ -937,6 +961,7 @@ Ext.define('PVE.window.GuestImport', {
 		    gettext('EFI state cannot be imported, you may need to reconfigure the boot order (see {0})'),
 		    '<a href="https://pve.proxmox.com/wiki/OVMF/UEFI_Boot_Entries">OVMF/UEFI Boot Entries</a>',
 		),
+		'ova-needs-extracting': gettext('Importing an OVA temporarily requires extra space on the working storage while extracting the contained disks for further processing.'),
 	    };
             let message = warningsCatalogue[w.type];
 	    if (!w.type || !message) {
@@ -1005,6 +1030,7 @@ Ext.define('PVE.window.GuestImport', {
 		}
 
 		me.getViewModel().set('warnings', data.warnings.map(w => renderWarning(w)));
+		me.getViewModel().set('isOva', data.warnings.map(w => w.type).indexOf('ova-needs-extracting') !== -1);
 
 		let osinfo = PVE.Utils.get_kvm_osinfo(me.vmConfig.ostype ?? '');
 		let prepareForVirtIO = (me.vmConfig.ostype ?? '').startsWith('w') && (me.vmConfig.bios ?? '').indexOf('ovmf') !== -1;

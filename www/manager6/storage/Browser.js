@@ -28,7 +28,9 @@ Ext.define('PVE.storage.Browser', {
 	let res = storageInfo.data;
 	let plugin = res.plugintype;
 
-	me.items = plugin !== 'esxi' ? [
+	let isEsxi = plugin === 'esxi';
+
+	me.items = !isEsxi ? [
 	    {
 		title: gettext('Summary'),
 		xtype: 'pveStorageSummary',
@@ -122,6 +124,7 @@ Ext.define('PVE.storage.Browser', {
 		});
 	    }
 	    if (contents.includes('import')) {
+		let isImportable = format => ['ova', 'ovf', 'vmx'].indexOf(format) !== -1;
 		let createGuestImportWindow = (selection) => {
 		    if (!selection) {
 			return;
@@ -138,19 +141,29 @@ Ext.define('PVE.storage.Browser', {
 		};
 		me.items.push({
 		    xtype: 'pveStorageContentView',
-		    title: gettext('Virtual Guests'),
-		    iconCls: 'fa fa-desktop',
+		    // each gettext needs to be in a separate line
+		    title: isEsxi ? gettext('Virtual Guests')
+			: gettext('Import'),
+		    iconCls: isEsxi ? 'fa fa-desktop' : 'fa fa-cloud-download',
 		    itemId: 'contentImport',
 		    content: 'import',
-		    useCustomRemoveButton: true, // hide default remove button
-		    showColumns: ['name', 'format'],
-		    itemdblclick: (view, record) => createGuestImportWindow(record),
+		    useCustomRemoveButton: isEsxi, // hide default remove button for esxi
+		    showColumns: isEsxi ? ['name', 'format'] : ['name', 'size', 'format'],
+		    enableUploadButton: enableUpload && !isEsxi,
+		    enableDownloadUrlButton: enableDownloadUrl && !isEsxi,
+		    useUploadButton: !isEsxi,
+		    itemdblclick: (view, record) => {
+			if (isImportable(record.data.format)) {
+			    createGuestImportWindow(record);
+			}
+		    },
 		    tbar: [
 			{
 			    xtype: 'proxmoxButton',
 			    disabled: true,
 			    text: gettext('Import'),
 			    iconCls: 'fa fa-cloud-download',
+			    enableFn: rec => isImportable(rec.data.format),
 			    handler: function() {
 				let grid = this.up('pveStorageContentView');
 				let selection = grid.getSelection()?.[0];
