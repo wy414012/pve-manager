@@ -4,6 +4,8 @@ Ext.define('PVE.window.GuestImport', {
 
     title: gettext('Import Guest'),
 
+    onlineHelp: 'qm_import_virtual_machines',
+
     width: 720,
     bodyPadding: 0,
 
@@ -565,7 +567,7 @@ Ext.define('PVE.window.GuestImport', {
 			reference: 'extractionStorage',
 			fieldLabel: gettext('Import Working Storage'),
 			storageContent: 'images',
-			emptyText: gettext('Import Storage'),
+			emptyText: gettext('Source Storage'),
 			autoSelect: false,
 			name: 'import-working-storage',
 			disabled: true,
