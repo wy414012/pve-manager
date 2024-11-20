@@ -1,3 +1,19 @@
+pve-manager (8.3.0-1) bookworm; urgency=medium
+
+  * ceph：为 Ceph Squid 版本移除预览标志。
+
+  * aplinfo：在密钥过期后更新 TurnkeyLinux 密钥。
+
+  * 更新已提供的设备信息索引。
+  
+  * ui：防火墙规则：在网格中添加空文本。
+
+  * ui：软件定义网络（SDN）虚拟网络、区域：在相应网格中添加空文本。
+
+  * ui：软件定义网络（SDN）：在特定于虚拟网络的防火墙导航标签上添加 VNET 前缀。
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Wed, 20 Nov 2024 22:18:25 +0800
+
 pve-manager (8.2.10-1) bookworm; urgency=medium
 
   * ui：防火墙**：将软件定义网络（SDN）添加为IP集选择器的有效范围。
@@ -165,6 +181,22 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+
+pve-manager (8.3.0) bookworm; urgency=medium
+
+  * ceph: drop preview flag for the Ceph Squid release
+
+  * aplinfo: update TurnkeyLinux key after expiry
+
+  * update shipped aplliance info index
+
+  * ui: firewall rules: add empty text to grid
+
+  * ui: sdn vnet, zone: add empty text to grids
+
+  * ui: sdn: add VNET prefix to vnet-specific firewall navigation label
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 20 Nov 2024 11:39:37 +0100
 
 pve-manager (8.2.10) bookworm; urgency=medium
 
