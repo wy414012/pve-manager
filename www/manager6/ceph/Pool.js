@@ -16,8 +16,10 @@ Ext.define('PVE.CephPoolInputPanel', {
 
 	init: function(view) {
 	    let vm = this.getViewModel();
-	    vm.set('size', Number(view.defaultSize));
-	    vm.set('minSize', Number(view.defaultMinSize));
+	    if (view.isCreate) {
+		vm.set('size', Number(view.defaultSize));
+		vm.set('minSize', Number(view.defaultMinSize));
+	    }
 	},
 	sizeChange: function(field, val) {
 	    let vm = this.getViewModel();
@@ -308,6 +310,14 @@ Ext.define('PVE.node.Ceph.PoolList', {
 	    hidden: true,
 	},
 	{
+	    text: gettext('Application'),
+	    minWidth: 100,
+	    flex: 1,
+	    dataIndex: 'application_metadata',
+	    hidden: true,
+	    renderer: (v, _meta, _rec) => Object.keys(v).toString(),
+	},
+	{
 	    text: gettext('Size') + '/min',
 	    minWidth: 100,
 	    flex: 1,
@@ -532,21 +542,22 @@ Ext.define('PVE.node.Ceph.PoolList', {
 }, function() {
     Ext.define('ceph-pool-list', {
 	extend: 'Ext.data.Model',
-	fields: ['pool_name',
-		  { name: 'pool', type: 'integer' },
-		  { name: 'size', type: 'integer' },
-		  { name: 'min_size', type: 'integer' },
-		  { name: 'pg_num', type: 'integer' },
-		  { name: 'pg_num_min', type: 'integer' },
-		  { name: 'bytes_used', type: 'integer' },
-		  { name: 'percent_used', type: 'number' },
-		  { name: 'crush_rule', type: 'integer' },
-		  { name: 'crush_rule_name', type: 'string' },
-		  { name: 'pg_autoscale_mode', type: 'string' },
-		  { name: 'pg_num_final', type: 'integer' },
-		  { name: 'target_size_ratio', type: 'number' },
-		  { name: 'target_size', type: 'integer' },
-		],
+	fields: [
+	    'pool_name',
+	    { name: 'pool', type: 'integer' },
+	    { name: 'size', type: 'integer' },
+	    { name: 'min_size', type: 'integer' },
+	    { name: 'pg_num', type: 'integer' },
+	    { name: 'pg_num_min', type: 'integer' },
+	    { name: 'bytes_used', type: 'integer' },
+	    { name: 'percent_used', type: 'number' },
+	    { name: 'crush_rule', type: 'integer' },
+	    { name: 'crush_rule_name', type: 'string' },
+	    { name: 'pg_autoscale_mode', type: 'string' },
+	    { name: 'pg_num_final', type: 'integer' },
+	    { name: 'target_size_ratio', type: 'number' },
+	    { name: 'target_size', type: 'integer' },
+	],
 	idProperty: 'pool_name',
     });
 });
