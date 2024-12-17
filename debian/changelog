@@ -1,3 +1,9 @@
+pve-manager (8.3.2-1) bookworm; urgency=medium
+
+  * up:合并主库变更版本号为8.3.2-1
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Dec 2024 10:17:15 +0800
+
 pve-manager (8.3.1-1) bookworm; urgency=medium
 
   * up:合并主库变更版本号为8.3.1-1
@@ -187,6 +193,23 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+
+pve-manager (8.3.2) bookworm; urgency=medium
+
+  * api: network: add return schema for interface listing
+
+  * ui: ceph pool: indentation clean-up
+
+  * ui: ceph: don't set default size/min-size when editing existing pool
+
+  * ui: ceph pool: add opt-in column for the configured pool application
+
+  * ui: qemu: improve error handling and rendering the QGA provided IP
+    addresses of the guest.
+
+  * api: node status: complete API return schema
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 16 Dec 2024 17:52:29 +0100
 
 pve-manager (8.3.1) bookworm; urgency=medium
 
