@@ -1,3 +1,9 @@
+pve-manager (8.3.3-1) bookworm; urgency=medium
+
+  * 合并主库最新提交变更版本号+1
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Thu, 30 Jan 2025 22:47:15 +0800
+
 pve-manager (8.3.2-1) bookworm; urgency=medium
 
   * up:合并主库变更版本号为8.3.2-1
@@ -193,6 +199,14 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+
+pve-manager (8.3.3) bookworm; urgency=medium
+
+  * update shipped appliance info index
+
+  * add missing htmlEncode for some UI elements
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 20 Jan 2025 11:37:32 +0100
 
 pve-manager (8.3.2) bookworm; urgency=medium
 
