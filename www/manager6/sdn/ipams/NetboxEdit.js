@@ -18,7 +18,7 @@ Ext.define('PVE.sdn.ipams.NetboxInputPanel', {
     initComponent: function() {
 	var me = this;
 
-	me.items = [
+	me.column1 = [
 	    {
 		xtype: me.isCreate ? 'textfield' : 'displayfield',
 		name: 'ipam',
@@ -29,15 +29,27 @@ Ext.define('PVE.sdn.ipams.NetboxInputPanel', {
 	    },
 	    {
 		xtype: 'textfield',
+		name: 'token',
+		fieldLabel: gettext('Token'),
+		allowBlank: false,
+	    },
+	];
+
+	me.column2 = [
+	    {
+		xtype: 'textfield',
 		name: 'url',
 		fieldLabel: gettext('URL'),
 		allowBlank: false,
 	    },
+	];
+
+	me.columnB = [
 	    {
-		xtype: 'textfield',
-		name: 'token',
-		fieldLabel: gettext('Token'),
-		allowBlank: false,
+		xtype: 'pmxFingerprintField',
+		name: 'fingerprint',
+		value: me.isCreate ? null : undefined,
+		deleteEmpty: !me.isCreate,
 	    },
 	];
 
