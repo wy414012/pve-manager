@@ -3,6 +3,8 @@ Ext.define('Proxmox.node.NodeOptionsView', {
     alias: ['widget.proxmoxNodeOptionsView'],
     mixins: ['Proxmox.Mixin.CBind'],
 
+    cwidth1: 250,
+
     cbindData: function(_initialconfig) {
 	let me = this;
 
@@ -45,6 +47,7 @@ Ext.define('Proxmox.node.NodeOptionsView', {
 		    return Proxmox.Utils.defaultText;
 		}
 
+		// TODO: simplify once we can use ngetext
 		let secString = value === '1' ? gettext('Second') : gettext('Seconds');
 		return `${value} ${secString}`;
 	    },
@@ -56,13 +59,17 @@ Ext.define('Proxmox.node.NodeOptionsView', {
 	    vtype: 'MacAddress',
 	    labelWidth: 150,
 	    deleteEmpty: true,
-	    renderer: function(value) {
-		if (value === undefined) {
-		    return Proxmox.Utils.NoneText;
-		}
-
-		return value;
-	    },
+	    renderer: value => value !== undefined ? value : Proxmox.Utils.NoneText,
+	},
+	{
+	    xtype: 'integer',
+	    name: 'ballooning-target',
+	    text: gettext('RAM usage target for ballooning'),
+	    minValue: 0,
+	    maxValue: 100,
+	    deleteEmpty: true,
+	    onlineHelp: 'qm_memory',
+	    renderer: value => value !== undefined ? `${value}%` : gettext('Default (80%)'),
 	},
     ],
 });

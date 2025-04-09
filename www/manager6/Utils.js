@@ -694,12 +694,14 @@ Ext.define('PVE.Utils', {
 	'import': gettext('Import'),
     },
 
-    volume_is_qemu_backup: function(volid, format) {
-	return format === 'pbs-vm' || volid.match(':backup/vzdump-qemu-');
+    volume_is_qemu_backup: function(volume) {
+	return volume.format === 'pbs-vm' || volume.volid.match(':backup/vzdump-qemu-') ||
+	    volume.subtype === 'qemu';
     },
 
-    volume_is_lxc_backup: function(volid, format) {
-	return format === 'pbs-ct' || volid.match(':backup/vzdump-(lxc|openvz)-');
+    volume_is_lxc_backup: function(volume) {
+	return volume.format === 'pbs-ct' || volume.volid.match(':backup/vzdump-(lxc|openvz)-') ||
+	    volume.subtype === 'lxc';
     },
 
     authSchema: {
@@ -1288,7 +1290,7 @@ Ext.define('PVE.Utils', {
 	var type = record.data.type;
 	var id = record.data.id;
 
-	return Proxmox.Utils.format_task_description(type, id);
+	return Ext.htmlEncode(Proxmox.Utils.format_task_description(type, id));
     },
 
     render_optional_url: function(value) {
@@ -1645,6 +1647,7 @@ Ext.define('PVE.Utils', {
 	serial: 4,
 	rng: 1,
 	tpmstate: 1,
+	virtiofs: 10,
     },
 
     // we can have usb6 and up only for specific machine/ostypes
@@ -1734,7 +1737,7 @@ Ext.define('PVE.Utils', {
 	    } else {
 		msg = gettext('Connection error');
 	    }
-	    Proxmox.Utils.setErrorMask(view, msg);
+	    Proxmox.Utils.setErrorMask(view, Ext.htmlEncode(msg));
 	});
     },
 
@@ -1968,8 +1971,20 @@ Ext.define('PVE.Utils', {
 	return languageCookie || Proxmox.defaultLang || 'en';
     },
 
+    getFormattedGuestIdentifier: function(vmid, guestName) {
+	if (PVE.UIOptions.getTreeSortingValue('sort-field') === 'vmid') {
+	    return guestName ? `${vmid} (${guestName})` : vmid;
+	} else {
+	    return guestName ? `${guestName} (${vmid})` : vmid;
+	}
+    },
+
     formatGuestTaskConfirmation: function(taskType, vmid, guestName) {
-	return Proxmox.Utils.format_task_description(taskType, `${vmid} (${guestName})`);
+	let description = Proxmox.Utils.format_task_description(
+		taskType,
+		this.getFormattedGuestIdentifier(vmid, guestName),
+	);
+	return Ext.htmlEncode(description);
     },
 },
 
@@ -2042,6 +2057,7 @@ Ext.define('PVE.Utils', {
 	    qmsuspend: ['VM', gettext('Hibernate')],
 	    qmtemplate: ['VM', gettext('Convert to template')],
 	    resize: ['VM/CT', gettext('Resize')],
+	    reloadnetworkall: ['', gettext('Reload network configuration on all nodes')],
 	    spiceproxy: ['VM/CT', gettext('Console') + ' (Spice)'],
 	    spiceshell: ['', gettext('Shell') + ' (Spice)'],
 	    startall: ['', gettext('Bulk start VMs and Containers')],

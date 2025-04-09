@@ -233,7 +233,7 @@ Ext.define('PVE.CephSetFlags', {
 
     onlineHelp: 'pve_ceph_osds',
     isCreate: true,
-    title: Ext.String.format(gettext('Manage {0}'), 'Global OSD Flags'),
+    title: gettext('Manage Global OSD Flags'),
     submitText: gettext('Apply'),
 
     items: [
@@ -275,6 +275,7 @@ Ext.define('PVE.CephSetFlags', {
 			    text: 'Description',
 			    flex: 1,
 			    dataIndex: 'description',
+			    renderer: Ext.htmlEncode,
 			},
 		    ],
 		},
@@ -732,6 +733,7 @@ Ext.define('PVE.node.CephOsdTree', {
 	    dataIndex: 'device_class',
 	    align: 'right',
 	    width: 75,
+	    renderer: Ext.htmlEncode,
 	},
 	{
 	    text: "OSD Type",
@@ -745,6 +747,7 @@ Ext.define('PVE.node.CephOsdTree', {
 	    align: 'right',
 	    width: 75,
 	    hidden: true,
+	    renderer: Ext.htmlEncode,
 	},
 	{
 	    text: "DB Device",
@@ -752,6 +755,7 @@ Ext.define('PVE.node.CephOsdTree', {
 	    align: 'right',
 	    width: 75,
 	    hidden: true,
+	    renderer: Ext.htmlEncode,
 	},
 	{
 	    text: "WAL Device",
@@ -833,11 +837,11 @@ Ext.define('PVE.node.CephOsdTree', {
 	    },
 	    '-',
 	    {
-		text: gettext('Create') + ': OSD',
+		text: gettext('Create: OSD'),
 		handler: 'create_osd',
 	    },
 	    {
-		text: Ext.String.format(gettext('Manage {0}'), 'Global Flags'),
+		text: gettext('Manage Global Flags'),
 		handler: 'set_flags',
 	    },
 	    '->',

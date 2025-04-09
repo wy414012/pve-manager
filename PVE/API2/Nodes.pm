@@ -1766,7 +1766,7 @@ __PACKAGE__->register_method({
 
 	my $dccfg = PVE::Cluster::cfs_read_file('datacenter.cfg');
 	if ($dccfg->{http_proxy}) {
-	    $ua->proxy('http', $dccfg->{http_proxy});
+	    $ua->proxy(['http', 'https'], $dccfg->{http_proxy});
 	}
 
 	my $verify = $param->{'verify-certificates'} // 1;
@@ -2340,6 +2340,18 @@ my $create_migrate_worker = sub {
 	if (@{$preconditions->{local_resources}}) {
 	    $invalidConditions .= "\n  Has local resources: ";
 	    $invalidConditions .= join(', ', @{$preconditions->{local_resources}});
+	}
+
+	if (my $not_allowed_nodes = $preconditions->{not_allowed_nodes}) {
+	    if (my $unavail_storages = $not_allowed_nodes->{$target}->{unavailable_storages}) {
+		$invalidConditions .= "\n  Has unavailable storages: ";
+		$invalidConditions .= join(', ', $unavail_storages->@*);
+	    }
+
+	    if (my $unavail_resources = $not_allowed_nodes->{$target}->{'unavailable-resources'}) {
+		$invalidConditions .= "\n  Has unavailable resources: ";
+		$invalidConditions .= join(', ', $unavail_resources->@*);
+	    }
 	}
 
 	if ($invalidConditions && $invalidConditions ne '') {

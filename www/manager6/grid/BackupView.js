@@ -29,15 +29,17 @@ Ext.define('PVE.grid.BackupView', {
 	var vmtypeFilter;
 	if (vmtype === 'lxc' || vmtype === 'openvz') {
 	    vmtypeFilter = function(item) {
-		return PVE.Utils.volume_is_lxc_backup(item.data.volid, item.data.format);
+		return PVE.Utils.volume_is_lxc_backup(item.data);
 	    };
 	} else if (vmtype === 'qemu') {
 	    vmtypeFilter = function(item) {
-		return PVE.Utils.volume_is_qemu_backup(item.data.volid, item.data.format);
+		return PVE.Utils.volume_is_qemu_backup(item.data);
 	    };
 	} else {
 	    throw "unsupported VM type '" + vmtype + "'";
 	}
+
+	let vmname = me.pveSelNode.data.name;
 
 	var searchFilter = {
 	    property: 'volid',
@@ -167,6 +169,7 @@ Ext.define('PVE.grid.BackupView', {
 		    nodename: nodename,
 		    vmid: vmid,
 		    vmtype: vmtype,
+		    vmname: vmname,
 		    storage: storagesel.getValue(),
 		    listeners: {
 			close: function() {
@@ -189,6 +192,7 @@ Ext.define('PVE.grid.BackupView', {
 		let win = Ext.create('PVE.window.Restore', {
 		    nodename: nodename,
 		    vmid: vmid,
+		    vmname: vmname,
 		    volid: rec.data.volid,
 		    volidText: PVE.Utils.render_storage_content(rec.data.volid, {}, rec),
 		    vmtype: vmtype,

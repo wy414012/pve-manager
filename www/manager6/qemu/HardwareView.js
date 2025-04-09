@@ -310,15 +310,26 @@ Ext.define('PVE.qemu.HardwareView', {
 		del_extra_msg: gettext('This will permanently erase all data.'),
 		editor: caps.vms['VM.Config.Disk'] ? 'PVE.qemu.HDEdit' : undefined,
 		header: gettext('Unused Disk') + ' ' + i.toString(),
+		renderer: Ext.htmlEncode,
 	    };
 	}
 	rows.rng0 = {
 	    group: 45,
 	    tdCls: 'pve-itype-icon-die',
-	    editor: caps.nodes['Sys.Console'] ? 'PVE.qemu.RNGEdit' : undefined,
-	    never_delete: !caps.nodes['Sys.Console'],
+	    editor: caps.vms['VM.Config.HWType'] || caps.mapping.hwrng['Mapping.Use'] ? 'PVE.qemu.RNGEdit' : undefined,
+	    never_delete: !caps.vms['VM.Config.HWType'] && !caps.mapping.hwrng['Mapping.Use'],
 	    header: gettext("VirtIO RNG"),
 	};
+	for (let i = 0; i < PVE.Utils.hardware_counts.virtiofs; i++) {
+	    let confid = "virtiofs" + i.toString();
+	    rows[confid] = {
+		group: 50,
+		order: i,
+		iconCls: 'folder',
+		editor: 'PVE.qemu.VirtiofsEdit',
+		header: gettext('Virtiofs') + ' (' + confid +')',
+	    };
+	}
 
 	var sorterFn = function(rec1, rec2) {
 	    var v1 = rec1.data.key;
@@ -588,22 +599,23 @@ Ext.define('PVE.qemu.HardwareView', {
 	    });
 
 	    // heuristic only for disabling some stuff, the backend has the final word.
-	    const noSysConsolePerm = !caps.nodes['Sys.Console'];
 	    const noHWPerm = !caps.nodes['Sys.Console'] && !caps.mapping['Mapping.Use'];
 	    const noVMConfigHWTypePerm = !caps.vms['VM.Config.HWType'];
 	    const noVMConfigNetPerm = !caps.vms['VM.Config.Network'];
 	    const noVMConfigDiskPerm = !caps.vms['VM.Config.Disk'];
 	    const noVMConfigCDROMPerm = !caps.vms['VM.Config.CDROM'];
 	    const noVMConfigCloudinitPerm = !caps.vms['VM.Config.Cloudinit'];
+	    const noVMConfigOptionsPerm = !caps.vms['VM.Config.Options'];
 
 	    me.down('#addUsb').setDisabled(noHWPerm || isAtUsbLimit());
 	    me.down('#addPci').setDisabled(noHWPerm || isAtLimit('hostpci'));
 	    me.down('#addAudio').setDisabled(noVMConfigHWTypePerm || isAtLimit('audio'));
 	    me.down('#addSerial').setDisabled(noVMConfigHWTypePerm || isAtLimit('serial'));
 	    me.down('#addNet').setDisabled(noVMConfigNetPerm || isAtLimit('net'));
-	    me.down('#addRng').setDisabled(noSysConsolePerm || isAtLimit('rng'));
+	    me.down('#addRng').setDisabled(noVMConfigHWTypePerm || isAtLimit('rng'));
 	    efidisk_menuitem.setDisabled(noVMConfigDiskPerm || isAtLimit('efidisk'));
 	    me.down('#addTpmState').setDisabled(noVMConfigDiskPerm || isAtLimit('tpmstate'));
+	    me.down('#addVirtiofs').setDisabled(noVMConfigOptionsPerm || isAtLimit('virtiofs'));
 	    me.down('#addCloudinitDrive').setDisabled(noVMConfigCDROMPerm || noVMConfigCloudinitPerm || hasCloudInit);
 
 	    if (!rec) {
@@ -745,8 +757,15 @@ Ext.define('PVE.qemu.HardwareView', {
 				text: gettext("VirtIO RNG"),
 				itemId: 'addRng',
 				iconCls: 'pve-itype-icon-die',
-				disabled: !caps.nodes['Sys.Console'],
+				disabled: !caps.vms['VM.Config.HWType'] && !caps.mapping.hwrng['Mapping.Use'],
 				handler: editorFactory('RNGEdit'),
+			    },
+			    {
+				text: gettext("Virtiofs"),
+				itemId: 'addVirtiofs',
+				iconCls: 'fa fa-folder',
+				disabled: !caps.nodes['Sys.Console'],
+				handler: editorFactory('VirtiofsEdit'),
 			    },
 			],
 		    }),
