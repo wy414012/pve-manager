@@ -316,8 +316,8 @@ Ext.define('PVE.qemu.HardwareView', {
 	rows.rng0 = {
 	    group: 45,
 	    tdCls: 'pve-itype-icon-die',
-	    editor: caps.vms['VM.Config.HWType'] || caps.mapping.hwrng['Mapping.Use'] ? 'PVE.qemu.RNGEdit' : undefined,
-	    never_delete: !caps.vms['VM.Config.HWType'] && !caps.mapping.hwrng['Mapping.Use'],
+	    editor: caps.vms['VM.Config.HWType'] || caps.mapping['Mapping.Use'] ? 'PVE.qemu.RNGEdit' : undefined,
+	    never_delete: !caps.vms['VM.Config.HWType'] && !caps.mapping['Mapping.Use'],
 	    header: gettext("VirtIO RNG"),
 	};
 	for (let i = 0; i < PVE.Utils.hardware_counts.virtiofs; i++) {
@@ -599,7 +599,6 @@ Ext.define('PVE.qemu.HardwareView', {
 	    });
 
 	    // heuristic only for disabling some stuff, the backend has the final word.
-	    const noHWPerm = !caps.nodes['Sys.Console'] && !caps.mapping['Mapping.Use'];
 	    const noVMConfigHWTypePerm = !caps.vms['VM.Config.HWType'];
 	    const noVMConfigNetPerm = !caps.vms['VM.Config.Network'];
 	    const noVMConfigDiskPerm = !caps.vms['VM.Config.Disk'];
@@ -607,8 +606,8 @@ Ext.define('PVE.qemu.HardwareView', {
 	    const noVMConfigCloudinitPerm = !caps.vms['VM.Config.Cloudinit'];
 	    const noVMConfigOptionsPerm = !caps.vms['VM.Config.Options'];
 
-	    me.down('#addUsb').setDisabled(noHWPerm || isAtUsbLimit());
-	    me.down('#addPci').setDisabled(noHWPerm || isAtLimit('hostpci'));
+	    me.down('#addUsb').setDisabled(noVMConfigHWTypePerm || isAtUsbLimit());
+	    me.down('#addPci').setDisabled(noVMConfigHWTypePerm || isAtLimit('hostpci'));
 	    me.down('#addAudio').setDisabled(noVMConfigHWTypePerm || isAtLimit('audio'));
 	    me.down('#addSerial').setDisabled(noVMConfigHWTypePerm || isAtLimit('serial'));
 	    me.down('#addNet').setDisabled(noVMConfigNetPerm || isAtLimit('net'));
@@ -757,7 +756,7 @@ Ext.define('PVE.qemu.HardwareView', {
 				text: gettext("VirtIO RNG"),
 				itemId: 'addRng',
 				iconCls: 'pve-itype-icon-die',
-				disabled: !caps.vms['VM.Config.HWType'] && !caps.mapping.hwrng['Mapping.Use'],
+				disabled: !caps.vms['VM.Config.HWType'] && !caps.mapping['Mapping.Use'],
 				handler: editorFactory('RNGEdit'),
 			    },
 			    {
