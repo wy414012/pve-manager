@@ -1,3 +1,9 @@
+pve-manager (8.4.1-2) bookworm; urgency=medium
+
+  * Update package version
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Wed, 11 Jun 2025 13:09:42 +0800
+
 pve-manager (8.4.1-1) bookworm; urgency=medium
 
   * 合并到最新提交8.4.1版本代码
