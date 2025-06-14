@@ -7,51 +7,71 @@ on:
   release:
     types: [published]
 
+defaults:
+  run:
+    shell: 'bash -x {0}'
+
 jobs:
   build:
-    runs-on:  Linux
+    runs-on: ubuntu-latest
+    container: debian:12
     steps:
     - uses: actions/checkout@v4
     - name: update sources.list
-      run:  sudo apt update
+      run:  |
+        apt update && \
+        apt dist-upgrade -y && \
+        apt install -y \
+        sudo \
+        curl \
+        wget \
+        unzip \
+        git \
+        git-lfs \
+        openssl \
+        devscripts \
+        equivs \
+        gawk \
+        gnupg2 \
+        systemd \
+        jq \
+        ca-certificates && \
+        echo "deb [arch=amd64] http://download.proxmox.com/debian/pve bookworm pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list && \
+        echo "deb [arch=amd64] http://download.proxmox.com/debian/devel bookworm main" > /etc/apt/sources.list.d/pve-devel.list && \
+        wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg && \
+        apt update && apt dist-upgrade -y
 
     - name: install tools
       run: sudo apt-get -y install devscripts equivs
-    
-    - name: install deps    
-      run: yes | sudo mk-build-deps --install
-        
-    - name: remove deps
-      run: yes | sudo mk-build-deps --install --remove
-      
-    - name: run make
-      run: make deb
 
-    - name: set key
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.GIT_PRIVATE_KEY }}
+    - name: install deps    
+      run: sudo mk-build-deps -i < <(yes) || true
+            
+    - name: run make
+      run: make clean && make deb
+
+    - name: List what has been built
+      if: ${{ !cancelled() }}
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
-        echo "StrictHostKeyChecking no" >> ~/.ssh/config
-        
-    - name: Push Web server
-      env:
-        SECRET_CHECK_SCRIPT_URL: ${{ secrets.SECRET_CHECK_SCRIPT_URL }}
-      run: rsync -avz --exclude '*-build-deps*' ./pve-manager_* ${SECRET_CHECK_SCRIPT_URL}
-        
+          find . -name "*.deb" -o -name "*.buildinfo" -o -name "*.changes" | xargs ls -ld
+
     - name: upload artifact
       uses: actions/upload-artifact@v4
       with:
           name: pve-manager
-          path: ./*.deb
+          path: |
+           ./*.deb
+           ./*.buildinfo
+           ./*.changes
 
     - name: upload-release
       if: github.event_name == 'release'
       uses: svenstaro/upload-release-action@v2
       with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./*.deb
+          file: |
+           ./*.deb
+           ./*.buildinfo
+           ./*.changes
           tag: ${{ github.ref }}
           file_glob: true
