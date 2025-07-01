@@ -26,6 +26,7 @@ jobs:
         curl \
         wget \
         unzip \
+        rsync \
         git \
         git-lfs \
         openssl \
