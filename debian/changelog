@@ -1,3 +1,9 @@
+pve-manager (8.4.1-4) bookworm; urgency=medium
+
+  * 将该版本切换到稳定分支存储，避免新的覆盖
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 01 Jul 2025 10:12:53 +0800
+
 pve-manager (8.4.1-3) bookworm; urgency=medium
 
   * add Github CI
