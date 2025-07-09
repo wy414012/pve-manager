@@ -48,11 +48,7 @@ Ext.define('PVE.ceph.CephVersionSelector', {
                 type: 'json',
             },
         },
-        data: [
-            { release: 'quincy', version: '17.2' },
-            { release: 'reef', version: '18.2' },
-            { release: 'squid', version: '19.2' },
-        ],
+        data: [{ release: 'squid', version: '19.2' }],
     },
 });
 
@@ -109,6 +105,7 @@ Ext.define('PVE.ceph.CephHighestVersionDisplay', {
                     17: 'quincy',
                     18: 'reef',
                     19: 'squid',
+                    20: 'tentacle',
                 };
                 let release = major2release[maxversion[0]] || 'unknown';
                 let newestVersionTxt = `${Ext.String.capitalize(release)} (${maxversiontext})`;
@@ -146,7 +143,7 @@ Ext.define('PVE.ceph.CephInstallWizard', {
     viewModel: {
         data: {
             nodename: '',
-            cephRelease: 'reef', // default
+            cephRelease: 'squid', // default
             cephRepo: 'enterprise',
             configuration: true,
             isInstalled: false,

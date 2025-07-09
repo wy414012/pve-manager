@@ -17,6 +17,7 @@ use PVE::Ceph::Tools;
 use PVE::Cluster;
 use PVE::Corosync;
 use PVE::INotify;
+use PVE::Jobs;
 use PVE::JSONSchema;
 use PVE::NodeConfig;
 use PVE::RPCEnvironment;
@@ -132,7 +133,7 @@ my $get_systemd_unit_state = sub {
 
     eval {
         run_command(['systemctl', 'is-enabled', "$unit"], %extra);
-        return if !defined($state);
+        return if !defined($state) || $state eq 'not-found';
         run_command(['systemctl', 'is-active', "$unit"], %extra);
     };
 
@@ -1061,8 +1062,7 @@ sub check_storage_content_dirs {
 sub check_containers_cgroup_compat {
     if ($forced_legacy_cgroup) {
         log_fail("System explicitly configured for legacy hybrid cgroup hierarchy.\n"
-            . "     NOTE: support for the hybrid cgroup hierarchy is removed in Proxmox VE 9!"
-        );
+            . "     NOTE: support for the hybrid cgroup hierarchy is removed in Proxmox VE 9!");
     }
 
     my $supports_cgroupv2 = sub {
@@ -1416,6 +1416,75 @@ sub check_dkms_modules {
     }
 }
 
+sub check_legacy_notification_sections {
+    log_info("Check for legacy 'filter' or 'group' sections in /etc/pve/notifications.cfg...");
+
+    my $raw = eval { PVE::Tools::file_get_contents("/etc/pve/notifications.cfg") };
+    return if !defined($raw);
+
+    my $failed = 0;
+    my @lines = split(/\n/, $raw);
+
+    for my $line (@lines) {
+        # Any line in a section config is either a comment (starts with #), a
+        # section header (starts with the section type, without any leading
+        # space) or is a property indented by whitespace. This means we
+        # should be able to reliably detect the legacy sections by just
+        # checking the start of the line.
+
+        if ($line =~ /^filter/) {
+            $failed = 1;
+            log_fail("found legacy 'filter' section: $line");
+        }
+
+        if ($line =~ /^group/) {
+            $failed = 1;
+            log_fail("found legacy 'group' section: $line");
+        }
+    }
+
+    if ($failed) {
+        log_fail("Any modification to the notification configuration via the API or Web UI will"
+            . " automatically remove these sections. Alternatively, you can remove the offending"
+            . " sections from /etc/pve/notifications.cfg by hand.");
+    } else {
+        log_pass("No legacy 'filter' or 'group' sections found!");
+    }
+}
+
+sub check_legacy_backup_job_options {
+    log_info(
+        "Check for legacy 'notification-policy' or 'notification-target' options in /etc/pve/jobs.cfg..."
+    );
+
+    my $job_cfg = PVE::Cluster::cfs_read_file('jobs.cfg');
+
+    my $failed = 0;
+
+    for my $jobid (sort keys $job_cfg->{ids}->%*) {
+        my $cfg = $job_cfg->{ids}->{$jobid};
+
+        if (defined($cfg->{'notification-policy'})) {
+            $failed = 1;
+            log_fail("found legacy 'notification-policy' option for job '$jobid'");
+        }
+
+        if (defined($cfg->{'notification-target'})) {
+            $failed = 1;
+            log_fail("found legacy 'notification-target' option for job '$jobid'");
+        }
+    }
+
+    if ($failed) {
+        log_fail(
+            "Changing the backup job configuration via the UI will automatically clear these options."
+                . "Alternatively, you can remove the offending options from /etc/pve/jobs.cfg by hand"
+        );
+    } else {
+        log_pass("No legacy 'notification-policy' or 'notification-target' options found!");
+    }
+}
+
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
     my $ssh_config = eval { PVE::Tools::file_get_contents('/root/.ssh/config') };
@@ -1525,6 +1594,8 @@ sub check_misc {
     check_nvidia_vgpu_service();
     check_bootloader();
     check_dkms_modules();
+    check_legacy_notification_sections();
+    check_legacy_backup_job_options();
 }
 
 my sub colored_if {
