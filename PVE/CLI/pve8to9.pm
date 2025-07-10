@@ -23,7 +23,7 @@ use PVE::NodeConfig;
 use PVE::RPCEnvironment;
 use PVE::Storage;
 use PVE::Storage::Plugin;
-use PVE::Tools qw(run_command split_list file_get_contents);
+use PVE::Tools qw(run_command split_list file_get_contents trim);
 use PVE::QemuConfig;
 use PVE::QemuServer;
 use PVE::VZDump::Common;
@@ -54,7 +54,7 @@ my $older_suites = {
     jessie => 1,
 };
 
-my ($min_pve_major, $min_pve_minor, $min_pve_pkgrel) = (8, 4, 1);
+my ($min_pve_major, $min_pve_minor, $min_pve_pkgrel) = (8, 4, 0);
 
 my $ceph_release2code = {
     '12' => 'Luminous',
@@ -1485,6 +1485,102 @@ sub check_legacy_backup_job_options {
     }
 }
 
+sub query_autoactivated_lvm_guest_volumes {
+    my ($cfg, $storeid, $vgname) = @_;
+
+    my $cmd = [
+        '/sbin/lvs',
+        '--separator',
+        ':',
+        '--noheadings',
+        '--unbuffered',
+        '--options',
+        "lv_name,autoactivation",
+        $vgname,
+    ];
+
+    my $autoactivated_lvs;
+    eval {
+        run_command(
+            $cmd,
+            outfunc => sub {
+                my $line = shift;
+                $line = trim($line);
+
+                my ($name, $autoactivation_flag) = split(':', $line);
+                return if !$name;
+
+                $autoactivated_lvs->{$name} = $autoactivation_flag eq 'enabled';
+            },
+        );
+    };
+    die "could not list LVM logical volumes: $@\n" if $@;
+
+    my $vollist = PVE::Storage::volume_list($cfg, $storeid);
+
+    my $autoactivated_guest_lvs = [];
+    for my $volinfo (@$vollist) {
+        my $volname = (PVE::Storage::parse_volume_id($volinfo->{volid}))[1];
+        push @$autoactivated_guest_lvs, $volname if $autoactivated_lvs->{$volname};
+    }
+
+    return $autoactivated_guest_lvs;
+}
+
+sub check_lvm_autoactivation {
+    my $cfg = PVE::Storage::config();
+    my $storage_info = PVE::Storage::storage_info($cfg);
+
+    log_info("Check for LVM autoactivation settings on LVM and LVM-thin storages...");
+
+    my ($needs_fix, $shared_affected) = (0, 0);
+
+    for my $storeid (sort keys %$storage_info) {
+        my $scfg = PVE::Storage::storage_config($cfg, $storeid);
+        my $type = $scfg->{type};
+        next if $type ne 'lvm' && $type ne 'lvmthin';
+
+        my $vgname = $scfg->{vgname};
+        die "unexpected empty VG name (storage '$storeid')\n" if !$vgname;
+
+        my $info = $storage_info->{$storeid};
+        if (!$info->{enabled} || !$info->{active}) {
+            log_skip("storage '$storeid' ($type) is disabled or inactive");
+            next;
+        }
+
+        my $autoactivated_guest_lvs =
+            query_autoactivated_lvm_guest_volumes($cfg, $storeid, $vgname);
+        if (scalar(@$autoactivated_guest_lvs) > 0) {
+            log_notice("storage '$storeid' has guest volumes with auto-activation enabled");
+            $needs_fix = 1;
+            $shared_affected = 1 if $info->{shared};
+        } else {
+            log_pass("all guest volumes on storage '$storeid' have auto-activation disabled");
+        }
+    }
+    if ($needs_fix) {
+        # only warn if shared storages are affected, for local ones this is mostly cosmetic.
+        my $_log = $shared_affected ? \log_warn : \log_notice;
+        my $extra =
+            $shared_affected
+            ? "Some affected volumes are on shared LVM storages, which has known issues (Bugzilla"
+            . " #4997). Disabling auto-activation for those is strongly recommended!"
+            : "All volumes with auto-activations reside on local storage, where this normally does"
+            . " not causes any issues.";
+        $_log->(
+            "Starting with PVE 9, auto-activation will be disabled for new LVM/LVM-thin guest"
+                . " volumes. This system has some volumes that still have auto-activation enabled. "
+                . "$extra\nYou can run the following command to disable auto-activation for existing"
+                . "LVM/LVM-thin "
+                . "guest volumes:" . "\n\n"
+                . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
+                . "\n");
+    }
+
+    return undef;
+}
+
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
     my $ssh_config = eval { PVE::Tools::file_get_contents('/root/.ssh/config') };
@@ -1596,6 +1692,7 @@ sub check_misc {
     check_dkms_modules();
     check_legacy_notification_sections();
     check_legacy_backup_job_options();
+    check_lvm_autoactivation();
 }
 
 my sub colored_if {
