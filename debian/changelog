@@ -1,3 +1,15 @@
+
+pve-manager (8.4.3-1) bookworm; urgency=medium
+
+  * pve8to9: fix error from bad log code ref.
+
+  * migrations: LVM autoactivation: setup CLI environment.
+
+  * ui: guest importer: use modern 4MB EFI-type for imported VMs that use EFI
+    as firmware.
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Wed, 16 Jul 2025 10:06:40 +0800
+
 pve-manager (8.4.1-4) bookworm; urgency=medium
 
   * 将该版本切换到稳定分支存储，避免新的覆盖
@@ -235,6 +247,34 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+
+pve-manager (8.4.3) bookworm; urgency=medium
+
+  * pve8to9: fix error from bad log code ref.
+
+  * migrations: LVM autoactivation: setup CLI environment.
+
+  * ui: guest importer: use modern 4MB EFI-type for imported VMs that use EFI
+    as firmware.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Jul 2025 01:31:04 +0200
+
+pve-manager (8.4.2) bookworm; urgency=medium
+
+  * fix #6311: ui: prevent the login consent text from showing twice for OIDC
+    authentication realms.
+
+  * pve system report: fix assembling relevant SDN configuration files.
+
+  * update shipped aplliance info index
+
+  * pveversion: track the proxmox-backup-restore-image package.
+
+  * add initial `pve8to9` upgrade check list tool to continue preparation for
+    next major release and to put it through the Proxmox internal early
+    release QA.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 09 Jul 2025 18:17:37 +0200
 
 pve-manager (8.4.1) bookworm; urgency=medium
 

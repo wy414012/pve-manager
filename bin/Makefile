@@ -13,6 +13,7 @@ CLITOOLS = \
 	pvenode \
 	pvesh \
 	pve7to8 \
+	pve8to9 \
 
 
 SCRIPTS =  			\
@@ -28,6 +29,9 @@ SCRIPTS =  			\
 HELPERS =			\
 	pve-startall-delay	\
 	pve-init-ceph-crash
+
+MIGRATIONS =			\
+	pve-lvm-disable-autoactivation
 
 SERVICE_MANS = $(addsuffix .8, $(SERVICES))
 
@@ -57,13 +61,6 @@ all: $(SERVICE_MANS) $(CLI_MANS)
 	podselect $* > $@.tmp
 	mv $@.tmp $@
 
-pve6to7.1:
-	printf ".TH PVE6TO7 1\n.SH NAME\npve6to7 \- Proxmox VE upgrade checker script for 6.4 to 7.x\n" > $@.tmp
-	printf ".SH NOTE\npve6to7 is for the previous upgrade, from Proxmox VE 6 to 7, but there's a\
-	 new Proxmox VE 8 available, see the 'pve7to8' tool.\n" >> $@.tmp
-	printf ".SH SYNOPSIS\npve6to7 [--full]\n" >> $@.tmp
-	mv $@.tmp $@
-
 pve7to8.1:
 	printf ".TH PVE7TO8 1\n.SH NAME\npve7to8 \- Proxmox VE upgrade checker script for 7.4+ to current 8.x\n" > $@.tmp
 	printf ".SH DESCRIPTION\nThis tool will help you to detect common pitfalls and misconfguration\
@@ -73,9 +70,23 @@ pve7to8.1:
 	printf ".SH SYNOPSIS\npve7to8 [--full]\n" >> $@.tmp
 	mv $@.tmp $@
 
+pve8to9.1:
+	printf ".TH PVE8TO9 1\n.SH NAME\npve8to9 \- Proxmox VE upgrade checker script for 8.4+ to current 9.x\n" > $@.tmp
+	printf ".SH DESCRIPTION\nThis tool will help you to detect common pitfalls and misconfguration\
+	 before, and during the upgrade of a Proxmox VE system\n" >> $@.tmp
+	printf "Any failure must be addressed before the upgrade, and any warning must be addressed, \
+	 or at least carefully evaluated, if a false-positive is suspected\n" >> $@.tmp
+	printf ".SH SYNOPSIS\npve8to9 [--full]\n" >> $@.tmp
+	mv $@.tmp $@
+
+
 pveversion.1.pod: pveversion
 pveupgrade.1.pod: pveupgrade
 pvereport.1.pod: pvereport
+
+.PHONY: tidy
+tidy:
+	echo $(SCRIPTS) $(HELPERS) $(MIGRATIONS) | xargs -n4 -P0 proxmox-perltidy
 
 .PHONY: check
 check: $(addsuffix .service-api-verified, $(SERVICES)) $(addsuffix .api-verified, $(CLITOOLS))
@@ -87,6 +98,8 @@ install: $(SCRIPTS) $(CLI_MANS) $(SERVICE_MANS) $(BASH_COMPLETIONS) $(ZSH_COMPLE
 	install -m 0755 $(SCRIPTS) $(BINDIR)
 	install -d $(USRSHARE)/helpers
 	install -m 0755 $(HELPERS) $(USRSHARE)/helpers
+	install -d $(USRSHARE)/migrations
+	install -m 0755 $(MIGRATIONS) $(USRSHARE)/migrations
 	install -d $(MAN1DIR)
 	install -m 0644 $(CLI_MANS) $(MAN1DIR)
 	install -d $(MAN8DIR)
