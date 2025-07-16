@@ -125,7 +125,6 @@ __PACKAGE__->register_method({
     method => 'POST',
     description => "Install ceph related packages.",
     parameters => {
-<<<<<<< HEAD
 	additionalProperties => 0,
 	properties => {
 	    version => {
@@ -149,31 +148,6 @@ __PACKAGE__->register_method({
 		description => "Allow experimental versions. Use with care!",
 	    },
 	},
-=======
-        additionalProperties => 0,
-        properties => {
-            version => {
-                type => 'string',
-                enum => $available_ceph_release_codenames,
-                default => $default_ceph_version,
-                description => "Ceph version to install.",
-                optional => 1,
-            },
-            repository => {
-                type => 'string',
-                enum => ['enterprise', 'no-subscription', 'test'],
-                default => 'enterprise',
-                description => "Ceph repository to use.",
-                optional => 1,
-            },
-            'allow-experimental' => {
-                type => 'boolean',
-                default => 0,
-                optional => 1,
-                description => "Allow experimental versions. Use with care!",
-            },
-        },
->>>>>>> f548db7ea18b34390b5fcb7aa27e50a0d18ed3cd
     },
     returns => { type => 'null' },
     code => sub {
