@@ -1,3 +1,9 @@
+pve-manager (8.4.6-1) bookworm; urgency=medium
+
+  * Update 8.4.6-1
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Wed, 30 Jul 2025 17:26:13 +0800
+
 pve-manager (8.4.3-1) bookworm; urgency=medium
 
   * pve8to9: fix error from bad log code ref.
@@ -246,6 +252,42 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
   * 同步变更日志，更新版本号为8.2.5-1
   
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 17 Sep 2024 11:33:54 +0800
+ 
+pve-manager (8.4.6) bookworm; urgency=medium
+
+  * 8to9 upgrade checks (pve8to9):
+    - machine version: place VMIDs in dedicated line.
+    - lvm: use consistent spelling for autoactivation.
+    - test pvetest -> pve-test transition.
+    - add check to ensure that 'keyring' option for external RBD storages is
+      set Additionally provide a migration-script to help automate this
+      required config migration.
+    - increase severity of having 'maxfiles' setting configured from warning
+      to failure.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 29 Jul 2025 17:45:36 +0200
+
+pve-manager (8.4.5) bookworm; urgency=medium
+
+  * 8to9 upgrade checks: fix duplicate variable name in same scope.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2025 15:32:03 +0200
+
+pve-manager (8.4.4) bookworm; urgency=medium
+
+  * 8to9 upgrade checks:
+    - add check for to-be-dropped QEMU machine versions.
+    - check for usage of deprecated native GlusterFS storages.
+    - remove outdated checks for user roles.
+    - check for to-be-dropped VM.Monitor privilege in custom roles.
+    - add dedicated section for virtual guest checks.
+
+  * metrics: handle existence of new pve-{type}-9.0 data to avoid friction on
+    update.
+
+  * metrics: drop old virtual guest RRD schema.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 17 Jul 2025 22:52:50 +0200
 
 pve-manager (8.4.3) bookworm; urgency=medium
 

@@ -19,6 +19,7 @@ use PVE::Corosync;
 use PVE::INotify;
 use PVE::Jobs;
 use PVE::JSONSchema;
+use PVE::Network;
 use PVE::NodeConfig;
 use PVE::RPCEnvironment;
 use PVE::Storage;
@@ -26,6 +27,7 @@ use PVE::Storage::Plugin;
 use PVE::Tools qw(run_command split_list file_get_contents trim);
 use PVE::QemuConfig;
 use PVE::QemuServer;
+use PVE::QemuServer::Machine;
 use PVE::VZDump::Common;
 use PVE::LXC;
 use PVE::LXC::Config;
@@ -268,6 +270,120 @@ sub check_pve_packages {
     }
 }
 
+sub check_rbd_storage_keyring {
+    my ($cfg, $dry_run) = @_;
+
+    my $pve_managed = [];
+    my $already_good = [];
+    my $update = [];
+
+    log_info("Checking whether all external RBD storages have the 'keyring' option configured");
+
+    my ($any_rbd_storage, $any_external_rbd_storage) = (0, 0);
+    for my $storeid (sort keys $cfg->{ids}->%*) {
+        eval {
+            my $scfg = PVE::Storage::storage_config($cfg, $storeid);
+
+            return if $scfg->{type} ne 'rbd'; # return from eval
+            $any_rbd_storage = 1;
+
+            if (!defined($scfg->{monhost})) {
+                push $pve_managed->@*, $storeid;
+                return; # return from eval
+            }
+            $any_external_rbd_storage = 1;
+
+            my $ceph_storage_keyring = "/etc/pve/priv/ceph/${storeid}.keyring";
+            my $ceph_storage_config = "/etc/pve/priv/ceph/${storeid}.conf";
+
+            my $ceph_config = {};
+
+            if (-e $ceph_storage_config) {
+                my $content = PVE::Tools::file_get_contents($ceph_storage_config);
+                $ceph_config =
+                    PVE::CephConfig::parse_ceph_config($ceph_storage_config, $content);
+
+                if (my $keyring_path = $ceph_config->{global}->{keyring}) {
+                    if ($keyring_path eq $ceph_storage_keyring) {
+                        push $already_good->@*, $storeid;
+                    } else {
+                        log_warn(
+                            "storage $storeid: keyring option configured ($keyring_path), but"
+                                . " different from the expected value ($ceph_storage_keyring),"
+                                . " check manually!");
+                    }
+
+                    return; # return from eval
+                }
+            }
+
+            if (!-e $ceph_storage_keyring) {
+                log_notice("skipping storage $storeid: keyring file $ceph_storage_keyring does"
+                    . " not exist");
+                return; # return from eval
+            }
+
+            if ($dry_run) {
+                push $update->@*, $storeid;
+                return; # return from eval
+            }
+
+            $ceph_config->{global}->{keyring} = $ceph_storage_keyring;
+
+            my $contents =
+                PVE::CephConfig::write_ceph_config($ceph_storage_config, $ceph_config);
+            PVE::Tools::file_set_contents($ceph_storage_config, $contents, 0600);
+
+            push $update->@*, $storeid;
+        };
+        my $err = $@;
+        if ($err) {
+            log_fail("could not ensure that 'keyring' option is set for storage '$storeid': $err");
+        }
+    }
+
+    if (!$any_rbd_storage) {
+        log_skip("No RBD storage configured.");
+        return;
+    }
+
+    if (scalar($pve_managed->@*)) {
+        my $storeid_txt = join(', ', $pve_managed->@*);
+        # pass test if there is no external
+        if ($any_external_rbd_storage) {
+            log_info("The following RBD storages are PVE-managed, nothing to do for them:\n\t$storeid_txt");
+        } else {
+            log_skip("Only PVE-managed RBD storages are configured, so nothing to do");
+        }
+    }
+
+    if (scalar($already_good->@*)) {
+        my $storeid_txt = join(', ', $already_good->@*);
+        log_pass(
+            "The following externally managed RBD storages already have the 'keyring' option"
+                . " configured correctly:\n\t$storeid_txt");
+    }
+
+    if (scalar($update->@*)) {
+        my $storeid_txt = join(', ', $update->@*);
+        if ($dry_run) {
+            log_notice(
+                "Starting with PVE 9, externally managed RBD storages require that the 'keyring'"
+                    . " option is configured in the storage's Ceph configuration.\nYou can run the"
+                    . " following command to automatically set the option:\n\n"
+                    . "\t/usr/share/pve-manager/migrations/pve-rbd-storage-configure-keyring\n");
+            log_fail(
+                "The Ceph configuration of the following externally managed RBD storages needs to"
+                    . " be updated:\n\t$storeid_txt");
+
+        } else {
+            log_pass(
+                "The Ceph configuration of the following externally managed RBD storages has"
+                    . " been updated:\n\t$storeid_txt");
+        }
+    }
+}
+
 sub check_storage_health {
     print_header("CHECKING CONFIGURED STORAGES");
     my $cfg = PVE::Storage::config();
@@ -292,6 +408,10 @@ sub check_storage_health {
     check_storage_content();
     eval { check_storage_content_dirs() };
     log_fail("failed to check storage content directories - $@") if $@;
+
+    check_glusterfs_storage_usage();
+
+    check_rbd_storage_keyring($cfg, 1);
 }
 
 sub check_cluster_corosync {
@@ -645,8 +765,8 @@ sub check_backup_retention_settings {
 
     my $pass = 1;
 
-    my $maxfiles_msg = "parameter 'maxfiles' is deprecated with PVE 7.x and will be removed in a "
-        . "future version, use 'prune-backups' instead.";
+    my $maxfiles_msg = "parameter 'maxfiles' was deprecated with PVE 7.x and is getting dropped"
+        . " with PVE 9.";
 
     eval {
         my $confdesc = PVE::VZDump::Common::get_confdesc();
@@ -661,12 +781,12 @@ sub check_backup_retention_settings {
 
         if (defined($param->{maxfiles})) {
             $pass = 0;
-            log_warn("$fn - $maxfiles_msg");
+            log_fail("$fn - $maxfiles_msg");
         }
     };
     if (my $err = $@) {
         $pass = 0;
-        log_warn("unable to parse node's VZDump configuration - $err");
+        log_fail("unable to parse node's VZDump configuration - $err");
     }
 
     my $storage_cfg = PVE::Storage::config();
@@ -676,7 +796,7 @@ sub check_backup_retention_settings {
 
         if (defined($scfg->{maxfiles})) {
             $pass = 0;
-            log_warn("storage '$storeid' - $maxfiles_msg");
+            log_fail("storage '$storeid' - $maxfiles_msg");
         }
     }
 
@@ -686,12 +806,12 @@ sub check_backup_retention_settings {
         # only warn once, there might be many jobs...
         if (scalar(grep { defined($_->{maxfiles}) } $vzdump_cron->{jobs}->@*)) {
             $pass = 0;
-            log_warn("/etc/pve/vzdump.cron - $maxfiles_msg");
+            log_fail("/etc/pve/vzdump.cron - $maxfiles_msg");
         }
     };
     if (my $err = $@) {
         $pass = 0;
-        log_warn("unable to parse node's VZDump configuration - $err");
+        log_fail("unable to parse node's VZDump configuration - $err");
     }
 
     log_pass("no backup retention problems found.") if $pass;
@@ -759,41 +879,162 @@ sub check_custom_pool_roles {
             for my $priv (split_list($privlist)) {
                 $roles->{$role}->{$priv} = 1;
             }
-        } elsif ($et eq 'acl') {
-            my ($propagate, $pathtxt, $uglist, $rolelist) = @data;
-            for my $role (split_list($rolelist)) {
-                if ($role eq 'PVESysAdmin' || $role eq 'PVEAdmin') {
-                    log_warn(
-                        "found ACL entry on '$pathtxt' for '$uglist' with role '$role' - this role"
-                            . " will no longer have 'Permissions.Modify' after the upgrade!");
+        }
+    }
+
+    log_info("Checking custom role IDs");
+    my ($custom_roles, $need_handling) = (0, 0);
+    for my $role (sort keys %{$roles}) {
+        next if PVE::AccessControl::role_is_special($role);
+        $custom_roles++;
+
+        $need_handling++ if $roles->{$role}->{'VM.Monitor'};
+    }
+    if ($need_handling > 0) {
+        log_notice(
+            "Proxmox VE 9 replaced the ambiguously named 'VM.Monitor' privilege with 'Sys.Audit'"
+                . " for QEMU HMP monitor access and new dedicated 'VM.GuestAgent.*' privileges"
+                . " for access to a VM's guest agent.\n\tThe guest agent sub-privileges are 'Audit'"
+                . " for all informational commands, 'FileRead' and 'FileWrite' for file-read and"
+                . " file-write, 'FileSystemMgmt' for filesystem freeze, thaw and trim, and"
+                . " 'Unrestricted' for everything, including command execution. Operations that"
+                . " affect the VM runstate require 'VM.PowerMgmt' or 'VM.GuestAgent.Unrestricted'");
+        log_fail(
+            "$need_handling custom role(s) use the to-be-dropped 'VM.Monitor' privilege and need"
+                . " to be adapted after the upgrade");
+    } elsif ($custom_roles > 0) {
+        log_pass("none of the $custom_roles custom roles need handling");
+    } else {
+        log_pass("no custom roles defined");
+    }
+}
+
+my sub check_qemu_machine_versions {
+    log_info("Checking VM configurations for outdated machine versions");
+
+    # QEMU 11.2 is expected to be the last release in Proxmox VE 9, so machine version 6.0 is the
+    # smallest that is supported until the end of the Proxmox VE 9 release cycle.
+    my @baseline = (6, 0);
+
+    my $old_configured = [];
+    my $old_hibernated = [];
+    my $old_online_snapshot = {};
+    my $old_offline_snapshot = {};
+
+    my $vms = PVE::QemuServer::config_list();
+    for my $vmid (sort { $a <=> $b } keys $vms->%*) {
+        my $conf = PVE::QemuConfig->load_config($vmid);
+
+        # first, actually configured machine version
+        my $machine_type = PVE::QemuServer::Machine::get_vm_machine($conf, undef, $conf->{arch});
+        if (
+            PVE::QemuServer::Machine::extract_version($machine_type) # no version means latest
+            && !PVE::QemuServer::Machine::is_machine_version_at_least($machine_type, @baseline)
+        ) {
+            push $old_configured->@*, $vmid;
+        }
+
+        # second, if hibernated, running machine version
+        if ($conf->{vmstate}) {
+            my $machine_type = PVE::QemuServer::Machine::get_vm_machine(
+                $conf,
+                $conf->{runningmachine},
+                $conf->{arch},
+            );
+            if (
+                PVE::QemuServer::Machine::extract_version($machine_type) # no version means latest
+                && !PVE::QemuServer::Machine::is_machine_version_at_least(
+                    $machine_type, @baseline,
+                )
+            ) {
+                push $old_hibernated->@*, $vmid;
+            }
+        }
+
+        # third, snapshots using old machine versions
+        if (defined($conf->{snapshots})) {
+            for my $snap (keys $conf->{snapshots}->%*) {
+                my $snap_conf = $conf->{snapshots}->{$snap};
+
+                my $machine_type = PVE::QemuServer::Machine::get_vm_machine(
+                    $snap_conf,
+                    $snap_conf->{runningmachine},
+                    $snap_conf->{arch},
+                );
+                if ( # no version means latest
+                    PVE::QemuServer::Machine::extract_version($machine_type)
+                    && !PVE::QemuServer::Machine::is_machine_version_at_least(
+                        $machine_type, @baseline,
+                    )
+                ) {
+                    if ($snap_conf->{vmstate}) {
+                        push $old_online_snapshot->{$vmid}->@*, $snap;
+                    } else {
+                        push $old_offline_snapshot->{$vmid}->@*, $snap;
+                    }
                 }
             }
         }
     }
 
-    log_info("Checking custom role IDs for clashes with new 'PVE' namespace..");
-    my ($custom_roles, $pve_namespace_clashes) = (0, 0);
-    for my $role (sort keys %{$roles}) {
-        next if PVE::AccessControl::role_is_special($role);
-        $custom_roles++;
-
-        if ($role =~ /^PVE/i) {
-            log_warn("custom role '$role' clashes with 'PVE' namespace for built-in roles");
-            $pve_namespace_clashes++;
-        }
+    if (
+        !scalar($old_configured->@*)
+        && !scalar($old_hibernated->@*)
+        && !scalar(keys $old_offline_snapshot->%*)
+        && !scalar(keys $old_online_snapshot->%*)
+    ) {
+        log_pass("All VM machine versions are recent enough");
+        return;
     }
-    if ($pve_namespace_clashes > 0) {
-        log_fail(
-            "$pve_namespace_clashes custom role(s) will clash with 'PVE' namespace for built-in roles enforced in Proxmox VE 8"
-        );
-    } elsif ($custom_roles > 0) {
-        log_pass(
-            "none of the $custom_roles custom roles will clash with newly enforced 'PVE' namespace"
-        );
-    } else {
-        log_pass(
-            "no custom roles defined, so no clash with 'PVE' role ID namespace enforced in Proxmox VE 8"
-        );
+
+    my $basline_txt = join('.', @baseline);
+    my $next_pve_major = ($min_pve_major + 1);
+
+    log_notice(
+        "QEMU machine versions older than $basline_txt are expected to be dropped during the"
+            . " Proxmox VE $next_pve_major release life cycle. For more information, see:\n"
+            . "\thttps://pve.proxmox.com/pve-docs/chapter-qm.html#qm_machine_type\n"
+            . "\tand https://pve.proxmox.com/wiki/QEMU_Machine_Version_Upgrade");
+
+    if (scalar($old_configured->@*)) {
+        my $vmid_list_txt = join(',', $old_configured->@*);
+        log_warn(
+            "VMs with the following IDs have an old machine version configured. The machine version"
+                . " might need to be updated to be able to start the VM in Proxmox VE"
+                . " $next_pve_major:\n\t$vmid_list_txt");
+    }
+
+    if (scalar($old_hibernated->@*)) {
+        my $vmid_list_txt = join(',', $old_hibernated->@*);
+        log_warn(
+            "VMs with the following IDs are hibernated with an old machine version and it might not"
+                . " be possible to resume them in Proxmox VE $next_pve_major:\n\t$vmid_list_txt");
+    }
+
+    if (scalar(keys $old_online_snapshot->%*)) {
+        my $vmid_txts = [];
+        for my $vmid (sort keys $old_online_snapshot->%*) {
+            my $snapshot_list_txt = join(',', $old_online_snapshot->{$vmid}->@*);
+            push $vmid_txts->@*, "$vmid: $snapshot_list_txt";
+        }
+        my $vmid_list_txt = join("; ", $vmid_txts->@*);
+        log_warn(
+            "VMs with the following IDs have live snapshots with an old machine version and it"
+                . " might not be possible to rollback to these snapshots in Proxmox VE"
+                . " $next_pve_major:\n\t$vmid_list_txt");
+    }
+
+    if (scalar(keys $old_offline_snapshot->%*)) {
+        my $vmid_txts = [];
+        for my $vmid (sort keys $old_offline_snapshot->%*) {
+            my $snapshot_list_txt = join(',', $old_offline_snapshot->{$vmid}->@*);
+            push $vmid_txts->@*, "$vmid: $snapshot_list_txt";
+        }
+        my $vmid_list_txt = join("; ", $vmid_txts->@*);
+        log_warn(
+            "VMs with the following IDs have snapshots with an old machine version configured."
+                . " The machine version might need to be updated after rollback to be able to start"
+                . " the VM in Proxmox VE $next_pve_major:\n\t$vmid_list_txt");
     }
 }
 
@@ -816,53 +1057,6 @@ sub check_node_and_guest_configurations {
                 . join(', ', @affected_nodes));
     } else {
         log_pass("All node config descriptions fit in the new limit of 64 KiB");
-    }
-
-    my $affected_guests_long_desc = [];
-    my $affected_cts_cgroup_keys = [];
-
-    my $cts = PVE::LXC::config_list();
-    for my $vmid (sort { $a <=> $b } keys %$cts) {
-        my $conf = PVE::LXC::Config->load_config($vmid);
-
-        my $desc = $conf->{description};
-        push @$affected_guests_long_desc, "CT $vmid" if defined($desc) && length($desc) > 8 * 1024;
-
-        my $lxc_raw_conf = $conf->{lxc};
-        push @$affected_cts_cgroup_keys, "CT $vmid"
-            if (grep (@$_[0] =~ /^lxc\.cgroup\./, @$lxc_raw_conf));
-    }
-    my $vms = PVE::QemuServer::config_list();
-    for my $vmid (sort { $a <=> $b } keys %$vms) {
-        my $desc = PVE::QemuConfig->load_config($vmid)->{description};
-        push @$affected_guests_long_desc, "VM $vmid" if defined($desc) && length($desc) > 8 * 1024;
-    }
-    if (scalar($affected_guests_long_desc->@*) > 0) {
-        log_warn(
-            "Guest config description of the following virtual-guests too long for new limit of 64 KiB:\n"
-                . "    "
-                . join(", ", $affected_guests_long_desc->@*));
-    } else {
-        log_pass("All guest config descriptions fit in the new limit of 8 KiB");
-    }
-
-    log_info("Checking container configs for deprecated lxc.cgroup entries");
-
-    if (scalar($affected_cts_cgroup_keys->@*) > 0) {
-        if ($forced_legacy_cgroup) {
-            log_notice(
-                "Found legacy 'lxc.cgroup' keys, but system explicitly configured for legacy hybrid cgroup hierarchy."
-            );
-        } else {
-            log_warn(
-                "The following CTs have 'lxc.cgroup' keys configured, which will be ignored in the new default unified cgroupv2:\n"
-                    . "    "
-                    . join(", ", $affected_cts_cgroup_keys->@*) . "\n"
-                    . "    Often it can be enough to change to the new 'lxc.cgroup2' prefix after the upgrade to Proxmox VE 7.x"
-            );
-        }
-    } else {
-        log_pass("No legacy 'lxc.cgroup' keys found.");
     }
 }
 
@@ -1233,7 +1427,10 @@ sub check_apt_repos {
     my ($found_suite, $found_suite_where);
     my ($mismatches, $strange_suites);
 
-    my $check_file = sub {
+    my ($found_pve_test_repo, $found_legacy_spelled_pve_test_repo) = (0, 0);
+    my $found_pve_test_repo_suite;
+
+    my $check_list_file = sub {
         my ($file) = @_;
 
         $file = "${dir}/${file}" if $in_dir;
@@ -1252,13 +1449,22 @@ sub check_apt_repos {
 
             next if $line !~ m/^deb[[:space:]]/; # is case sensitive
 
-            my $suite;
-            if ($line =~ m|deb\s+\w+://\S+\s+(\S*)|i) {
-                $suite = $1;
+            my ($url, $suite, $component);
+            if ($line =~ m|deb\s+(\w+://\S+)\s+(?:(\S+)(?:\s+(\S+))?)?|i) {
+                ($url, $suite, $component) = ($1, $2, $3);
             } else {
                 next;
             }
             my $where = "in ${file}:${number}";
+
+            if (defined($component)) {
+                if ($component =~ /pve-?test/) {
+                    $found_pve_test_repo = 1;
+                    # just safe one, mismatched suite check will handle multiple different ones already
+                    $found_pve_test_repo_suite = $suite;
+                    $found_legacy_spelled_pve_test_repo = 1 if $component eq 'pvetest';
+                }
+            }
 
             $suite =~ s/-(?:(?:proposed-)?updates|backports|debug|security)(?:-debug)?$//;
             if ($suite ne $old_suite && $suite ne $new_suite && !$older_suites->{$suite}) {
@@ -1282,11 +1488,11 @@ sub check_apt_repos {
         }
     };
 
-    $check_file->("/etc/apt/sources.list");
+    $check_list_file->("/etc/apt/sources.list");
 
     $in_dir = 1;
 
-    PVE::Tools::dir_glob_foreach($dir, '^.*\.list$', $check_file);
+    PVE::Tools::dir_glob_foreach($dir, '^.*\.list$', $check_list_file);
 
     if ($strange_suites) {
         my @strange_list = map { "found suite $_->{suite} at $_->{where}" } $strange_suites->@*;
@@ -1313,6 +1519,27 @@ sub check_apt_repos {
         log_notice("found no suite mismatches, but found at least one strange suite");
     } else {
         log_pass("found no suite mismatch");
+    }
+
+    if ($found_pve_test_repo) {
+        log_info(
+            "Found test repo for Proxmox VE, checking compatibility with updated 'pve-test' spelling."
+        );
+        if ($found_legacy_spelled_pve_test_repo) {
+            my $_log = $found_pve_test_repo_suite eq $new_suite ? \&log_fail : \&log_warn;
+            $_log->(
+                "Found legacy spelling 'pvetest' of the pve-test repo. Change the repo to use"
+                ." 'pve-test' when updating the repos to the '$new_suite' suite for Proxmox VE 9!"
+            );
+        } elsif ($found_pve_test_repo_suite eq $new_suite) {
+            log_pass("Found modern spelling 'pve-test' of the pve-test repo for new suite '$new_suite'.");
+        } elsif ($found_pve_test_repo_suite eq $old_suite) {
+            log_fail("Found modern spelling 'pve-test' but old suite '$old_suite', did you forgot to update the suite?");
+        } else {
+            # TODO: remove the whole check with PVE 10, one cannot really update to latest 9.4 with
+            # an old test repo anyway
+            log_fail("Found modern spelling 'pve-test' but unexpected suite '$found_pve_test_repo_suite'");
+        }
     }
 }
 
@@ -1552,11 +1779,11 @@ sub check_lvm_autoactivation {
         my $autoactivated_guest_lvs =
             query_autoactivated_lvm_guest_volumes($cfg, $storeid, $vgname);
         if (scalar(@$autoactivated_guest_lvs) > 0) {
-            log_notice("storage '$storeid' has guest volumes with auto-activation enabled");
+            log_notice("storage '$storeid' has guest volumes with autoactivation enabled");
             $needs_fix = 1;
             $shared_affected = 1 if $info->{shared};
         } else {
-            log_pass("all guest volumes on storage '$storeid' have auto-activation disabled");
+            log_pass("all guest volumes on storage '$storeid' have autoactivation disabled");
         }
     }
     if ($needs_fix) {
@@ -1565,21 +1792,150 @@ sub check_lvm_autoactivation {
         my $extra =
             $shared_affected
             ? "Some affected volumes are on shared LVM storages, which has known issues (Bugzilla"
-            . " #4997). Disabling auto-activation for those is strongly recommended!"
-            : "All volumes with auto-activations reside on local storage, where this normally does"
+            . " #4997). Disabling autoactivation for those is strongly recommended!"
+            : "All volumes with autoactivations reside on local storage, where this normally does"
             . " not causes any issues.";
         $_log->(
-            "Starting with PVE 9, auto-activation will be disabled for new LVM/LVM-thin guest"
-                . " volumes. This system has some volumes that still have auto-activation enabled. "
-                . "$extra\nYou can run the following command to disable auto-activation for existing"
-                . "LVM/LVM-thin "
-                . "guest volumes:" . "\n\n"
+            "Starting with PVE 9, autoactivation will be disabled for new LVM/LVM-thin guest"
+                . " volumes. This system has some volumes that still have autoactivation enabled. "
+                . "$extra\nYou can run the following command to disable autoactivation for existing"
+                . " LVM/LVM-thin guest volumes:\n\n"
                 . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
                 . "\n");
     }
 
     return undef;
 }
+
+sub check_glusterfs_storage_usage {
+    my $cfg = PVE::Storage::config();
+    my $storage_info = PVE::Storage::storage_info($cfg);
+
+    log_info("Check for usage of native GlusterFS storage plugin...");
+
+    my $has_glusterfs_storage = 0;
+
+    for my $storeid (sort keys $storage_info->%*) {
+        my $scfg = PVE::Storage::storage_config($cfg, $storeid);
+
+        next if $scfg->{type} ne 'glusterfs';
+
+        $has_glusterfs_storage = 1;
+        log_fail("found 'glusterfs' storage '$storeid'");
+    }
+
+    if ($has_glusterfs_storage) {
+        log_fail("Starting with Proxmox VE 9, native GlusterFS support will end. GlusterFS storage"
+            . " will therefore cease to work.\n"
+            . "This is because the GlusterFS project is no longer properly maintained.\n\n"
+            . "You will therefore have to move all GlusterFS volumes to different storage and then"
+            . " remove any configured GlusterFS storage before starting the upgrade.\n\n"
+            . "Alternatively, you can manually mount your GlusterFS instances via the 'glusterfs'"
+            . " command-line tool and use them as directory storage.");
+    } else {
+        log_pass("No GlusterFS storage found.");
+    }
+
+    return undef;
+}
+
+sub check_bridge_mtu {
+    log_info("Checking for VirtIO devices that would change their MTU...");
+
+    my $vms = PVE::QemuServer::config_list();
+
+    for my $vmid (sort { $a <=> $b } keys %$vms) {
+        my $config = PVE::QemuConfig->load_config($vmid);
+
+        for my $opt (sort keys $config->%*) {
+            next if $opt !~ m/^net\d+$/;
+            my $net = PVE::QemuServer::parse_net($config->{$opt});
+
+            next if $net->{model} ne 'virtio' || defined($net->{mtu});
+
+            my $bridge_mtu = PVE::Network::read_bridge_mtu($net->{bridge});
+
+            log_notice("network interface $opt of vm $vmid will have its mtu forced to $bridge_mtu")
+                if $bridge_mtu != 1500;
+        }
+    }
+}
+
+sub check_virtual_guests {
+    print_header("VIRTUAL GUEST CHECKS");
+
+    log_info("Checking for running guests..");
+    my $running_guests = 0;
+
+    my $local_vms = eval { PVE::API2::Qemu->vmlist({ node => $nodename }) };
+    log_warn("Failed to retrieve information about this node's VMs - $@") if $@;
+    $running_guests += grep { $_->{status} eq 'running' } @$local_vms if defined($local_vms);
+
+    my $local_cts = eval { PVE::API2::LXC->vmlist({ node => $nodename }) };
+    log_warn("Failed to retrieve information about this node's CTs - $@") if $@;
+    $running_guests += grep { $_->{status} eq 'running' } @$local_cts if defined($local_cts);
+
+    if ($running_guests > 0) {
+        log_warn(
+            "$running_guests running guest(s) detected - consider migrating or stopping them.");
+    } else {
+        log_pass("no running guest detected.");
+    }
+
+    check_lxcfs_fuse_version();
+
+    check_bridge_mtu();
+
+    my $affected_guests_long_desc = [];
+    my $affected_cts_cgroup_keys = [];
+
+    my $cts = PVE::LXC::config_list();
+    for my $vmid (sort { $a <=> $b } keys %$cts) {
+        my $conf = PVE::LXC::Config->load_config($vmid);
+
+        my $desc = $conf->{description};
+        push @$affected_guests_long_desc, "CT $vmid" if defined($desc) && length($desc) > 8 * 1024;
+
+        my $lxc_raw_conf = $conf->{lxc};
+        push @$affected_cts_cgroup_keys, "CT $vmid"
+            if (grep (@$_[0] =~ /^lxc\.cgroup\./, @$lxc_raw_conf));
+    }
+    my $vms = PVE::QemuServer::config_list();
+    for my $vmid (sort { $a <=> $b } keys %$vms) {
+        my $desc = PVE::QemuConfig->load_config($vmid)->{description};
+        push @$affected_guests_long_desc, "VM $vmid" if defined($desc) && length($desc) > 8 * 1024;
+    }
+    if (scalar($affected_guests_long_desc->@*) > 0) {
+        log_warn(
+            "Guest config description of the following virtual-guests too long for new limit of 64 KiB:\n"
+                . "    "
+                . join(", ", $affected_guests_long_desc->@*));
+    } else {
+        log_pass("All guest config descriptions fit in the new limit of 8 KiB");
+    }
+
+    log_info("Checking container configs for deprecated lxc.cgroup entries");
+
+    if (scalar($affected_cts_cgroup_keys->@*) > 0) {
+        if ($forced_legacy_cgroup) {
+            log_notice(
+                "Found legacy 'lxc.cgroup' keys, but system explicitly configured for legacy hybrid cgroup hierarchy."
+            );
+        } else {
+            log_warn(
+                "The following CTs have 'lxc.cgroup' keys configured, which will be ignored in the new default unified cgroupv2:\n"
+                    . "    "
+                    . join(", ", $affected_cts_cgroup_keys->@*) . "\n"
+                    . "    Often it can be enough to change to the new 'lxc.cgroup2' prefix after the upgrade to Proxmox VE 7.x"
+            );
+        }
+    } else {
+        log_pass("No legacy 'lxc.cgroup' keys found.");
+    }
+
+    check_qemu_machine_versions();
+}
+
 
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
@@ -1605,24 +1961,6 @@ sub check_misc {
         } elsif ($root_free->{avail} < 10 * 1000 * 1000 * 1000) {
             log_notice("Less than 10 GB free space on root file system.");
         }
-    }
-
-    log_info("Checking for running guests..");
-    my $running_guests = 0;
-
-    my $vms = eval { PVE::API2::Qemu->vmlist({ node => $nodename }) };
-    log_warn("Failed to retrieve information about this node's VMs - $@") if $@;
-    $running_guests += grep { $_->{status} eq 'running' } @$vms if defined($vms);
-
-    my $cts = eval { PVE::API2::LXC->vmlist({ node => $nodename }) };
-    log_warn("Failed to retrieve information about this node's CTs - $@") if $@;
-    $running_guests += grep { $_->{status} eq 'running' } @$cts if defined($cts);
-
-    if ($running_guests > 0) {
-        log_warn(
-            "$running_guests running guest(s) detected - consider migrating or stopping them.");
-    } else {
-        log_pass("no running guest detected.");
     }
 
     log_info("Checking if the local node's hostname '$nodename' is resolvable..");
@@ -1684,7 +2022,6 @@ sub check_misc {
     check_backup_retention_settings();
     check_cifs_credential_location();
     check_custom_pool_roles();
-    check_lxcfs_fuse_version();
     check_node_and_guest_configurations();
     check_apt_repos();
     check_nvidia_vgpu_service();
@@ -1729,6 +2066,7 @@ __PACKAGE__->register_method({
         check_cluster_corosync();
         check_ceph();
         check_storage_health();
+        check_virtual_guests();
         check_misc();
 
         if ($param->{full}) {
