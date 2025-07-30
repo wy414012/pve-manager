@@ -1,3 +1,161 @@
+pve-manager (9.0.0~12) trixie; urgency=medium
+
+  * 8to9 upgrade checks: sync over version from PVE 8.4 stable branch.
+
+  * external metric server: add support for OpenTelemetry.
+
+  * network-interface-pinning:
+    - use ifindex as order for pinning.
+    - improve printing mapping.
+    - add 'target-name' parameter.
+    - allow arbitrary target name and prefixes.
+
+  * fix #6534: ui: keep displaying help button in backup edit dialog.
+
+  * replace sencha touch mobile web UI by default with new Yew based one
+    written in rust. The new pve-yew-mobile-gui package can still be removed
+    to get the old package back, but it's planned to drop the outdated sencha
+    touch based mobile UI completely soon.
+
+  * pvestatd: pull metric: use ip link to detect physical interfaces, but
+    cache the data and update it only every 15 minutes to avoid frequent
+    polling, physical interfaces are not likely to change frequently.
+
+  * fix #5392: pveproxy, pvedaemon: make maximum number of worker configurable.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 29 Jul 2025 21:17:14 +0200
+
+pve-manager (9.0.0~11) trixie; urgency=medium
+
+  * 8to9 upgrade checks: machine version: place VMIDs in dedicated line.
+
+  * fix #6537: api: system services: system unit for postfix is again a normal
+    service in Trixie.
+
+  * ui: base storage: fix outdated wording in tech-preview hint.
+
+  * fix #6539: apl: use sqv instead of gpgv to verify signatures.
+
+  * network-interface-pinning: do not generate link files for virtual
+    functions (VFs).
+
+  * network-interface-pinning: fix pinning for bond members.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 22 Jul 2025 23:33:37 +0200
+
+pve-manager (9.0.0~10) trixie; urgency=medium
+
+  * d/postinst: only set-up pve-test repos for beta on fresh
+    installation as upgrades must have a valid repo already anyway, otherwise
+    they could not upgrade in the first place.
+
+  * 8to9 upgrade checks: fix calling the method for parsing network defices
+    from a VM config, it got moved in Proxmox VE 9 into a dedicated module.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 19 Jul 2025 20:56:45 +0200
+
+pve-manager (9.0.0~9) trixie; urgency=medium
+
+  * guest metrics: drop support for ancient RRD schema from before Proxmox VE
+    2.3 from 2013.
+
+  * guest metrics: support and prefer new pve-{type}-9.0 RRD files.
+
+  * network-interface-pinning: fix subsequent invocations.
+
+  * network-interface-pinning: early exit if nothing to do.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2025 20:48:14 +0200
+
+pve-manager (9.0.0~8) trixie; urgency=medium
+
+  * ui: add beta text with link to bug tracker
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2025 15:39:55 +0200
+
+pve-manager (9.0.0~7) trixie; urgency=medium
+
+  * d/postinst: setup pve-test repo for updates during the beta phase.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2025 15:24:25 +0200
+
+pve-manager (9.0.0~6) trixie; urgency=medium
+
+  * ui: dc/options: allow one to edit cluster wide replication settings.
+
+  * ui: disk storage selector: fix check for disabling format selector.
+
+  * 8to9 upgrade checks: fix duplicate variable name in same scope.
+
+  * fabrics: add max-length to fabric name to improve error message.
+
+  * ui: adapt to dropped VM.Monitor privilege.
+
+  * network-interface-pinning: avoid comparing undefined string.
+
+  * sdn-commit, firewall-commit: wait for cluster quorum.
+
+  * sdn-commit: only reload ifupdown if sdn configuration changed.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2025 14:39:57 +0200
+
+pve-manager (9.0.0~5) trixie; urgency=medium
+
+  * pve8to9: sync upgrade checks from stable branch.
+
+  * api: apt versions: drop glusterfs-client from package list.
+
+  * ui: storage edit: only LVM supports changing ext. snapshots for existing
+    storages.
+
+   * ui: storage base: rename label to "Allow Snapshots as Volume-Chain".
+
+   * ui: qemu: network: adjust MTU emptyText to match new default behavior.
+
+   * fabric: increase width of fabric edit/add window and add empty text
+     attributes to some input fields.
+
+   * pve-sdn-commit: fix reloading logic.
+
+   * proxmox-network-interface-pinning: add fabrics support.
+
+   * api: capabilities: proxy index endpoints to respective nodes.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 17 Jul 2025 23:35:02 +0200
+
+pve-manager (9.0.0~4) trixie; urgency=medium
+
+  * ui: backup job edit: move notification related settings to separate tab.
+
+  * ui: one-shot backup: remove 'auto' notification mode for clarity.
+
+  * ui: oneshot backup: stop shifting UI when selecting 'legacy-sendmail'.
+
+  * pvescheduler: move PID file from aliased /var/run legacy path into the
+    underlying /run directory.
+
+  * cli: add proxmox-network-interface-pinning tool.
+
+  * services: add pve-sdn-commit and pve-firewall-commit for applying pending
+    changes on boot.
+
+  * ui: drop support for adding native GlusterFS storage, like it was done
+    already for QEMU and the pve-storage library.
+
+  * ui: base storage: add checkbox for storage-managed (external) snapshots
+    for supported storage types.
+
+  * api: use new SDN config generation functions.
+
+  * ui: add SDN fabrics management.
+
+  * api/ui: show/return alternative interface names for node network
+    interfaces.
+
+  * ui: login: display error messages and status on failure.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 17 Jul 2025 02:33:52 +0200
+
 pve-manager (9.0.0~3) trixie; urgency=medium
 
   * pve8to9: sync checks from stable branch.

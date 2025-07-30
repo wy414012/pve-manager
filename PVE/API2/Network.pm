@@ -12,6 +12,7 @@ use PVE::RESTHandler;
 use PVE::RPCEnvironment;
 use PVE::JSONSchema qw(get_standard_option);
 use PVE::AccessControl;
+use PVE::Network;
 use IO::File;
 
 use base qw(PVE::RESTHandler);
@@ -43,6 +44,7 @@ my $network_type_enum = [
     'eth',
     'alias',
     'vlan',
+    'fabric',
     'OVSBridge',
     'OVSBond',
     'OVSPort',
@@ -231,6 +233,32 @@ sub json_config_properties {
     return $prop;
 }
 
+sub extract_altnames {
+    my ($iface, $altnames) = @_;
+
+    $altnames = PVE::Network::altname_mapping() if !defined($altnames);
+
+    my $iface_altnames = [];
+    my $original_iface;
+
+    # when we get an altname, first extract the legacy iface name
+    if (my $legacy_iface = $altnames->{$iface}) {
+        push $iface_altnames->@*, $legacy_iface;
+        $original_iface = $iface;
+        $iface = $legacy_iface;
+    }
+
+    for my $altname (keys $altnames->%*) {
+        next if defined($original_iface) && $original_iface eq $altname;
+        if ($altnames->{$altname} eq $iface) {
+            push $iface_altnames->@*, $altname;
+        }
+    }
+
+    return [sort $iface_altnames->@*] if scalar($iface_altnames->@*) > 0;
+    return undef;
+}
+
 __PACKAGE__->register_method({
     name => 'index',
     path => '',
@@ -245,7 +273,7 @@ __PACKAGE__->register_method({
             type => {
                 description => "Only list specific interface types.",
                 type => 'string',
-                enum => [@$network_type_enum, 'any_bridge', 'any_local_bridge'],
+                enum => [@$network_type_enum, 'any_bridge', 'any_local_bridge', 'include_sdn'],
                 optional => 1,
             },
         },
@@ -390,25 +418,51 @@ __PACKAGE__->register_method({
 
         my $ifaces = $config->{ifaces};
 
+        my $altnames = PVE::Network::altname_mapping();
+
         delete $ifaces->{lo}; # do not list the loopback device
 
         if (my $tfilter = $param->{type}) {
             my $vnets;
+            my $fabrics;
 
-            if ($have_sdn && $tfilter eq 'any_bridge') {
+            if ($have_sdn && $tfilter =~ /^(any_bridge|include_sdn|vnet)$/) {
                 $vnets = PVE::Network::SDN::get_local_vnets(); # returns already access-filtered
             }
 
-            for my $k (sort keys $ifaces->%*) {
-                my $type = $ifaces->{$k}->{type};
-                my $is_bridge = $type eq 'bridge' || $type eq 'OVSBridge';
-                my $bridge_match = $is_bridge && $tfilter =~ /^any(_local)?_bridge$/;
-                my $match = $tfilter eq $type || $bridge_match;
-                delete $ifaces->{$k} if !$match;
+            if ($have_sdn && $tfilter =~ /^(include_sdn|fabric)$/) {
+                my $local_node = PVE::INotify::nodename();
+
+                $fabrics =
+                    PVE::Network::SDN::Fabrics::config(1)->get_interfaces_for_node($local_node);
+            }
+
+            if ($tfilter ne 'include_sdn') {
+                for my $k (sort keys $ifaces->%*) {
+                    my $type = $ifaces->{$k}->{type};
+                    my $is_bridge = $type eq 'bridge' || $type eq 'OVSBridge';
+                    my $bridge_match = $is_bridge && $tfilter =~ /^any(_local)?_bridge$/;
+                    my $match = $tfilter eq $type || $bridge_match;
+                    delete $ifaces->{$k} if !$match;
+                }
             }
 
             if (defined($vnets)) {
                 $ifaces->{$_} = $vnets->{$_} for keys $vnets->%*;
+            }
+
+            if (defined($fabrics)) {
+                for my $fabric_id (keys %$fabrics) {
+                    next
+                        if !$rpcenv->check_any(
+                            $authuser,
+                            "/sdn/fabrics/$fabric_id",
+                            ['SDN.Audit', 'SDN.Use', 'SDN.Allocate'],
+                            1,
+                        );
+
+                    $ifaces->{$fabric_id} = $fabrics->{$fabric_id};
+                }
             }
         }
 
@@ -424,6 +478,9 @@ __PACKAGE__->register_method({
             my $type = $ifaces->{$k}->{type};
             delete $ifaces->{$k}
                 if ($type eq 'bridge' || $type eq 'OVSBridge') && !$can_access_vnet->($k);
+
+            my $iface_altnames = extract_altnames($k, $altnames);
+            $ifaces->{$k}->{altnames} = $iface_altnames if defined($iface_altnames);
         }
 
         return PVE::RESTHandler::hash_to_array($ifaces, 'iface');
@@ -789,10 +846,15 @@ __PACKAGE__->register_method({
         my $config = PVE::INotify::read_file('interfaces');
         my $ifaces = $config->{ifaces};
 
-        raise_param_exc({ iface => "interface does not exist" })
-            if !$ifaces->{ $param->{iface} };
+        my $iface = $param->{iface};
 
-        return $ifaces->{ $param->{iface} };
+        raise_param_exc({ iface => "interface does not exist" })
+            if !$ifaces->{$iface};
+
+        my $altnames = extract_altnames($iface);
+        $ifaces->{$iface}->{altnames} = $altnames if defined($altnames);
+
+        return $ifaces->{$iface};
     },
 });
 
@@ -829,6 +891,11 @@ __PACKAGE__->register_method({
         additionalProperties => 0,
         properties => {
             node => get_standard_option('pve-node'),
+            skip_frr => {
+                type => 'boolean',
+                description => 'Whether FRR config generation should get skipped or not.',
+                optional => 1,
+            },
         },
     },
     returns => { type => 'string' },
@@ -843,6 +910,8 @@ __PACKAGE__->register_method({
         my $current_config_file = "/etc/network/interfaces";
         my $new_config_file = "/etc/network/interfaces.new";
 
+        my $skip_frr = extract_param($param, 'skip_frr');
+
         assert_ifupdown2_installed();
 
         my $worker = sub {
@@ -850,7 +919,7 @@ __PACKAGE__->register_method({
             rename($new_config_file, $current_config_file) if -e $new_config_file;
 
             if ($have_sdn) {
-                PVE::Network::SDN::generate_zone_config();
+                PVE::Network::SDN::generate_etc_network_config();
                 PVE::Network::SDN::generate_dhcp_config();
             }
 
@@ -862,8 +931,8 @@ __PACKAGE__->register_method({
             };
             PVE::Tools::run_command(['ifreload', '-a'], errfunc => $err);
 
-            if ($have_sdn) {
-                PVE::Network::SDN::generate_controller_config(1);
+            if ($have_sdn && !$skip_frr) {
+                PVE::Network::SDN::generate_frr_config(1);
             }
         };
         return $rpcenv->fork_worker('srvreload', 'networking', $authuser, $worker);
@@ -922,3 +991,5 @@ __PACKAGE__->register_method({
         return undef;
     },
 });
+
+1;

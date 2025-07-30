@@ -124,6 +124,35 @@ Ext.define('PVE.dc.OptionView', {
                     editable: true,
                     notFoundIsValid: true,
                     vtype: 'IP64CIDRAddress',
+                    type: 'include_sdn',
+                },
+            ],
+        });
+        me.add_inputpanel_row('replication', gettext('Replication Settings'), {
+            renderer: PVE.Utils.render_as_property_string,
+            labelWidth: 120,
+            url: '/api2/extjs/cluster/options',
+            defaultKey: 'type',
+            items: [
+                {
+                    xtype: 'displayfield',
+                    name: 'type',
+                    fieldLabel: gettext('Type'),
+                    value: 'secure',
+                    submitValue: true,
+                },
+                {
+                    xtype: 'proxmoxNetworkSelector',
+                    name: 'network',
+                    fieldLabel: gettext('Network'),
+                    value: null,
+                    emptyText: Proxmox.Utils.defaultText,
+                    autoSelect: false,
+                    skipEmptyText: true,
+                    editable: true,
+                    notFoundIsValid: true,
+                    vtype: 'IP64CIDRAddress',
+                    type: 'include_sdn',
                 },
             ],
         });

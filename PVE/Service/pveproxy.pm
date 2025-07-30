@@ -29,7 +29,7 @@ use base qw(PVE::Daemon);
 my $cmdline = [$0, @ARGV];
 
 my %daemon_options = (
-    max_workers => 3,
+    max_workers => 3, # may be overridden in init
     restart_on_error => 5,
     stop_wait_time => 15,
     leave_children_open_on_reload => 1,
@@ -55,6 +55,7 @@ my $basedirs = {
     manager => '/usr/share/pve-manager',
     novnc => '/usr/share/novnc-pve',
     sencha_touch => '/usr/share/javascript/sencha-touch',
+    yew_mobile => '/usr/share/javascript/pve-yew-mobile-gui',
     widgettoolkit => '/usr/share/javascript/proxmox-widget-toolkit',
     xtermjs => '/usr/share/pve-xtermjs',
 };
@@ -64,6 +65,7 @@ sub init {
 
     # we use same ALLOW/DENY/POLICY as pveproxy
     my $proxyconf = PVE::APIServer::Utils::read_proxy_config($self->{name});
+    $self->{max_workers} = $proxyconf->{MAX_WORKERS} if $proxyconf->{MAX_WORKERS};
 
     my $accept_lock_fn = "/var/lock/pveproxy.lck";
 
@@ -87,6 +89,7 @@ sub init {
     add_dirs($dirs, '/pve2/js/' => "$basedirs->{manager}/js/");
     add_dirs($dirs, '/pve2/locale/', "$basedirs->{i18n}/");
     add_dirs($dirs, '/pve2/sencha-touch/', "$basedirs->{sencha_touch}/");
+    add_dirs($dirs, '/pve2/yew-mobile/', "$basedirs->{yew_mobile}/");
     add_dirs($dirs, '/pve2/touch/', "$basedirs->{manager}/touch/");
     add_dirs($dirs, '/pwt/css/' => "$basedirs->{widgettoolkit}/css/");
     add_dirs($dirs, '/pwt/images/' => "$basedirs->{widgettoolkit}/images/");
@@ -276,6 +279,8 @@ sub get_index {
         $dir = $basedirs->{xtermjs};
     } elsif ($mobile) {
         $dir = "$basedirs->{manager}/touch";
+        # prefer new Yew based mobile UI if it's installed
+        $dir = "$basedirs->{yew_mobile}" if -d $basedirs->{yew_mobile};
     }
 
     my $page = '';

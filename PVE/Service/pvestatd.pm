@@ -155,6 +155,9 @@ my sub broadcast_static_node_info {
     }
 }
 
+my ($cached_ip_links, $cached_ip_link_last_update) = (undef, 0);
+my $MAX_IP_LINK_CACHE_AGE_SECONDS = 15 * 60; # every 15 minutes
+
 sub update_node_status {
     my ($status_cfg, $pull_txn) = @_;
 
@@ -171,9 +174,28 @@ sub update_node_status {
     my $sublevel = $subinfo->{level} || '';
 
     my $netdev = PVE::ProcFSTools::read_proc_net_dev();
+
+    my $ctime = time();
+    if (
+        !defined($cached_ip_links)
+        || ($ctime - $cached_ip_link_last_update) > $MAX_IP_LINK_CACHE_AGE_SECONDS
+    ) {
+        $cached_ip_links = PVE::Network::ip_link_details();
+        $cached_ip_link_last_update = $ctime;
+    }
+
     # traffic from/to physical interface cards
     my ($netin, $netout) = (0, 0);
-    for my $dev (grep { /^$PVE::Network::PHYSICAL_NIC_RE$/ } keys %$netdev) {
+    for my $dev (keys %$netdev) {
+        my $ip_link = $cached_ip_links->{$dev};
+
+        if (PVE::Network::ip_link_is_physical($ip_link)) {
+            $netdev->{$dev}->{type} = 'physical';
+        } else {
+            $netdev->{$dev}->{type} = 'virtual';
+            next;
+        }
+
         $netin += $netdev->{$dev}->{receive};
         $netout += $netdev->{$dev}->{transmit};
     }
@@ -184,7 +206,7 @@ sub update_node_status {
     # everything not free is considered to be used
     my $dused = $dinfo->{blocks} - $dinfo->{bfree};
 
-    my $ctime = time();
+    $ctime = time(); # df can need a long time, so requery time.
 
     my $data = $generate_rrd_string->(
         [

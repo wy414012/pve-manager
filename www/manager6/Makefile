@@ -100,6 +100,7 @@ JSSRC= 							\
 	grid/ResourceGrid.js				\
 	panel/ConfigPanel.js				\
 	panel/BackupAdvancedOptions.js			\
+	panel/BackupNotificationOptions.js		\
 	panel/BackupJobPrune.js				\
 	panel/HealthWidget.js				\
 	panel/IPSet.js					\
@@ -307,6 +308,17 @@ JSSRC= 							\
 	sdn/zones/SimpleEdit.js				\
 	sdn/zones/VlanEdit.js				\
 	sdn/zones/VxlanEdit.js				\
+	sdn/FabricsView.js				\
+	sdn/fabrics/Common.js				\
+	sdn/fabrics/InterfacePanel.js				\
+	sdn/fabrics/NodeEdit.js				\
+	sdn/fabrics/FabricEdit.js				\
+	sdn/fabrics/openfabric/InterfacePanel.js				\
+	sdn/fabrics/openfabric/NodeEdit.js				\
+	sdn/fabrics/openfabric/FabricEdit.js				\
+	sdn/fabrics/ospf/InterfacePanel.js	\
+	sdn/fabrics/ospf/NodeEdit.js	\
+	sdn/fabrics/ospf/FabricEdit.js	\
 	storage/ContentView.js				\
 	storage/BackupView.js				\
 	storage/Base.js					\
@@ -314,7 +326,6 @@ JSSRC= 							\
 	storage/CIFSEdit.js				\
 	storage/CephFSEdit.js				\
 	storage/DirEdit.js				\
-	storage/GlusterFsEdit.js			\
 	storage/ImageView.js				\
 	storage/IScsiEdit.js				\
 	storage/LVMEdit.js				\
@@ -335,6 +346,10 @@ JSSRC= 							\
 WIDGETKIT=/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
 
 all:
+
+.PHONY: tidy
+tidy: $(JSSRC)
+	proxmox-biome format --fix $?
 
 .lint-incremental: $(JSSRC)
 	$(BIOME) lint $?

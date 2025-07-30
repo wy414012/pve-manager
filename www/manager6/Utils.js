@@ -191,7 +191,7 @@ Ext.define('PVE.Utils', {
                 if (value === undefined) {
                     return ' ';
                 } else {
-                    return `<div style="text-decoration: line-through;">${Ext.htmlEncode(value)}</div>`;
+                    return `<span style="text-decoration: line-through;">${Ext.htmlEncode(value)}</span>`;
                 }
             } else if (rec.data.pending[key] !== undefined && rec.data.pending[key] !== null) {
                 if (rec.data.pending[key] === 'deleted') {
@@ -796,12 +796,6 @@ Ext.define('PVE.Utils', {
             cifs: {
                 name: 'SMB/CIFS',
                 ipanel: 'CIFSInputPanel',
-                faIcon: 'building',
-                backups: true,
-            },
-            glusterfs: {
-                name: 'GlusterFS',
-                ipanel: 'GlusterFsInputPanel',
                 faIcon: 'building',
                 backups: true,
             },
