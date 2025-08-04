@@ -43,6 +43,8 @@ my $nodename = PVE::INotify::nodename();
 
 my $upgraded = 0; # set in check_pve_packages
 
+my $full_checks = !!0; # set by CLI --full parameter
+
 sub setup_environment {
     PVE::RPCEnvironment->setup_default_cli_env();
 }
@@ -351,7 +353,9 @@ sub check_rbd_storage_keyring {
         my $storeid_txt = join(', ', $pve_managed->@*);
         # pass test if there is no external
         if ($any_external_rbd_storage) {
-            log_info("The following RBD storages are PVE-managed, nothing to do for them:\n\t$storeid_txt");
+            log_info(
+                "The following RBD storages are PVE-managed, nothing to do for them:\n\t$storeid_txt"
+            );
         } else {
             log_skip("Only PVE-managed RBD storages are configured, so nothing to do");
         }
@@ -765,8 +769,8 @@ sub check_backup_retention_settings {
 
     my $pass = 1;
 
-    my $maxfiles_msg = "parameter 'maxfiles' was deprecated with PVE 7.x and is getting dropped"
-        . " with PVE 9.";
+    my $maxfiles_msg =
+        "parameter 'maxfiles' was deprecated with PVE 7.x and is getting dropped" . " with PVE 9.";
 
     eval {
         my $confdesc = PVE::VZDump::Common::get_confdesc();
@@ -1529,16 +1533,22 @@ sub check_apt_repos {
             my $_log = $found_pve_test_repo_suite eq $new_suite ? \&log_fail : \&log_warn;
             $_log->(
                 "Found legacy spelling 'pvetest' of the pve-test repo. Change the repo to use"
-                ." 'pve-test' when updating the repos to the '$new_suite' suite for Proxmox VE 9!"
+                    . " 'pve-test' when updating the repos to the '$new_suite' suite for Proxmox VE 9!"
             );
         } elsif ($found_pve_test_repo_suite eq $new_suite) {
-            log_pass("Found modern spelling 'pve-test' of the pve-test repo for new suite '$new_suite'.");
+            log_pass(
+                "Found modern spelling 'pve-test' of the pve-test repo for new suite '$new_suite'."
+            );
         } elsif ($found_pve_test_repo_suite eq $old_suite) {
-            log_fail("Found modern spelling 'pve-test' but old suite '$old_suite', did you forgot to update the suite?");
+            log_fail(
+                "Found modern spelling 'pve-test' but old suite '$old_suite', did you forgot to update the suite?"
+            );
         } else {
             # TODO: remove the whole check with PVE 10, one cannot really update to latest 9.4 with
             # an old test repo anyway
-            log_fail("Found modern spelling 'pve-test' but unexpected suite '$found_pve_test_repo_suite'");
+            log_fail(
+                "Found modern spelling 'pve-test' but unexpected suite '$found_pve_test_repo_suite'"
+            );
         }
     }
 }
@@ -1592,30 +1602,50 @@ sub check_bootloader {
     log_info("Checking bootloader configuration...");
 
     if (!-d '/sys/firmware/efi') {
+        if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
+            log_info(
+                "systemd-boot package installed on legacy-boot system is not necessary, consider remoing it"
+            );
+            return;
+        }
         log_skip("System booted in legacy-mode - no need for additional packages");
         return;
     }
 
     if (-f "/etc/kernel/proxmox-boot-uuids") {
         if (!$upgraded) {
-            log_skip("not yet upgraded, no need to check the presence of systemd-boot");
+            log_skip("not yet upgraded, systemd-boot still needed for bootctl");
             return;
         }
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
-            log_pass("bootloader packages installed correctly");
+            log_warn("systemd-boot meta-package installed this will cause issues on upgrades of"
+                . " boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly"
+                . " and remove 'systemd-boot'");
             return;
         }
-        log_warn("proxmox-boot-tool is used for bootloader configuration in uefi mode"
-            . " but the separate systemd-boot package is not installed,"
-            . " initializing new ESPs will not work until the package is installed");
-        return;
-    } elsif (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
-        log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
-            . " new grub versions will not be installed to /boot/efi!"
-            . " Install grub-efi-amd64.");
-        return;
     } else {
-        log_pass("bootloader packages installed correctly");
+        if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
+            my $exit_code = eval {
+                run_command(['bootctl', 'is-installed', '--quiet', '--graceful'], noerr => 1);
+            };
+            if ($exit_code != 0) {
+                log_warn(
+                    "systemd-boot meta-package installed but the system does not seem to use it"
+                        . " for booting. This can cause problems on upgrades of other boot-related packages"
+                        . " Consider removing 'systemd-boot'");
+            } else {
+                log_info("systemd-boot used as bootloader and fitting meta-package installed.");
+                return;
+            }
+        }
+        if (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
+            log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
+                . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64."
+            );
+            return;
+        } else {
+            log_pass("bootloader packages installed correctly");
+        }
     }
 }
 
@@ -1704,9 +1734,9 @@ sub check_legacy_backup_job_options {
 
     if ($failed) {
         log_fail(
-            "Changing the backup job configuration via the UI will automatically clear these options."
-                . "Alternatively, you can remove the offending options from /etc/pve/jobs.cfg by hand"
-        );
+            "Changing the backup job configuration via the UI will automatically clear these"
+                . " options. Alternatively, you can remove the offending options from "
+                . " /etc/pve/jobs.cfg by hand.");
     } else {
         log_pass("No legacy 'notification-policy' or 'notification-target' options found!");
     }
@@ -1861,6 +1891,87 @@ sub check_bridge_mtu {
     }
 }
 
+sub check_rrd_migration {
+    if (-e "/var/lib/rrdcached/db/pve-node-9.0") {
+        log_info("Check post RRD metrics data format migration situation...");
+
+        my $old_files = [];
+        my $record_old = sub {
+            my $file = shift;
+            $file =~ s!^/var/lib/rrdcached/db/!!;
+            push @$old_files, $file;
+        };
+        eval {
+            run_command(
+                [
+                    'find',
+                    '/var/lib/rrdcached/db',
+                    '-path',
+                    '*pve2-*',
+                    '-type',
+                    'f',
+                    '!',
+                    '-name',
+                    '*.old',
+                ],
+                outfunc => $record_old,
+                noerr => 1,
+            );
+        };
+
+        if (my $count = scalar($old_files->@*)) {
+            my $cutoff = 29; # avoid spamming the check output to much for bigger setups
+            if (!$full_checks && $count > $cutoff + 1) {
+                splice @$old_files, $cutoff + 1;
+                push @$old_files, '... omitted printing ' . ($count - $cutoff) . ' additional files';
+            }
+            log_warn("Found '$count' RRD files that have not yet been migrated to the new schema.\n"
+                . join("\n\t ", $old_files->@*)
+                . "\n\tPlease run the following command manually:\n"
+                . "\t/usr/libexec/proxmox/proxmox-rrd-migration-tool --migrate\n");
+        } else {
+            log_pass("No old RRD metric files found, normally this means all have been migrated.");
+        }
+
+    } else {
+        log_info("Check space requirements for RRD migration...");
+        # multiplier values taken from KiB sizes of old and new RRD files
+        my $rrd_dirs = {
+            nodes => {
+                path => "/var/lib/rrdcached/db/pve2-node",
+                multiplier => 18.1,
+            },
+            guests => {
+                path => "/var/lib/rrdcached/db/pve2-vm",
+                multiplier => 20.2,
+            },
+            storage => {
+                path => "/var/lib/rrdcached/db/pve2-storage",
+                multiplier => 11.14,
+            },
+        };
+
+        my $size_buffer = 1024 * 1024 * 1024; # at least one GiB of free space should be calculated in
+        my $total_size_estimate = 0;
+        for my $type (keys %$rrd_dirs) {
+            my $size = PVE::Tools::du($rrd_dirs->{$type}->{path});
+            $total_size_estimate =
+                $total_size_estimate + ($size * $rrd_dirs->{$type}->{multiplier});
+        }
+        my $root_free = PVE::Tools::df('/', 10);
+
+        if (($total_size_estimate + $size_buffer) >= $root_free->{avail}) {
+            my $estimate_gib = sprintf("%.2f", $total_size_estimate / 1024 / 1024 / 1024);
+            my $free_gib = sprintf("%.2f", $root_free->{avail} / 1024 / 1024 / 1024);
+
+            log_fail("Not enough free space to migrate existing RRD files to the new format!\n"
+                . "Migrating the current RRD files is expected to consume about ${estimate_gib} GiB plus 1 GiB of safety."
+                . " But there is currently only ${free_gib} GiB space on the root file system available.\n"
+            );
+        }
+    }
+}
+
 sub check_virtual_guests {
     print_header("VIRTUAL GUEST CHECKS");
 
@@ -1936,6 +2047,51 @@ sub check_virtual_guests {
     check_qemu_machine_versions();
 }
 
+my $LEGACY_IPAM_DB = "/etc/pve/priv/ipam.db";
+my $NEW_IPAM_DB = "/etc/pve/sdn/pve-ipam-state.json";
+
+my $LEGACY_MAC_DB = "/etc/pve/priv/macs.db";
+my $NEW_MAC_DB = "/etc/pve/sdn/mac-cache.json";
+
+sub check_legacy_ipam_files {
+    log_info("Checking for IPAM DB files that have not yet been migrated.");
+
+    if (-e $LEGACY_IPAM_DB) {
+        if (-e $NEW_IPAM_DB) {
+            log_notice(
+                "Found leftover legacy IPAM DB file in $LEGACY_IPAM_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+."
+            );
+        } else {
+            log_fail(
+                "Found IPAM DB file in $LEGACY_IPAM_DB that has not been migrated!\n"
+                . "\tFile needs to be migrated to $NEW_IPAM_DB before upgrading. Updating"
+                ." pve-network to the newest version should take care of that!\n"
+                ."\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+            );
+        }
+    } else {
+        log_pass("No legacy IPAM DB found.");
+    }
+
+    if (-e $LEGACY_MAC_DB) {
+        if (-e $NEW_MAC_DB) {
+            log_notice(
+                "Found leftover legacy MAC DB file in $LEGACY_MAC_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+"
+            );
+        } else {
+            log_fail(
+                "Found MAC DB file in $LEGACY_MAC_DB that has not been migrated!\n"
+                . "\tFile needs to be migrated to $NEW_MAC_DB before upgrading. Updating"
+                ." pve-network to the newest version should take care of that!\n"
+                ."\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+            );
+        }
+    } else {
+        log_pass("No legacy MAC DB found.");
+    }
+}
 
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
@@ -2030,6 +2186,8 @@ sub check_misc {
     check_legacy_notification_sections();
     check_legacy_backup_job_options();
     check_lvm_autoactivation();
+    check_rrd_migration();
+    check_legacy_ipam_files();
 }
 
 my sub colored_if {
@@ -2056,6 +2214,8 @@ __PACKAGE__->register_method({
     returns => { type => 'null' },
     code => sub {
         my ($param) = @_;
+
+        $full_checks = !!$param->{full};
 
         my $kernel_cli = PVE::Tools::file_get_contents('/proc/cmdline');
         if ($kernel_cli =~ /systemd.unified_cgroup_hierarchy=0/) {
