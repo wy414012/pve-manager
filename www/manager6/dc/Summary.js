@@ -234,7 +234,7 @@ Ext.define('PVE.dc.Summary', {
         me.mon(rstore, 'load', dcHealth.updateStatus, dcHealth);
 
         let subs = me.down('#subscriptions');
-        me.mon(rstore, 'load', function (store, records, success) {
+        me.mon(rstore, 'load', function (_store, _records, _success) {
             let data = {
                 title: PVE.Utils.render_support_level('active'), // 使用有效的订阅级别
                 iconCls: PVE.Utils.get_health_icon('good', true),
