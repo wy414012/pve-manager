@@ -1,3 +1,9 @@
+pve-manager (8.4.7-3) bookworm; urgency=medium
+
+  * add 8 to 9
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Mon, 04 Aug 2025 23:51:27 +0800
+
 pve-manager (8.4.7-2) bookworm; urgency=medium
 
   * fix:修复提交哈希
