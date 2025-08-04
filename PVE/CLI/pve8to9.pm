@@ -1631,7 +1631,7 @@ sub check_bootloader {
             if ($exit_code != 0) {
                 log_warn(
                     "systemd-boot meta-package installed but the system does not seem to use it"
-                        . " for booting. This can cause problems on upgrades of other boot-related packages"
+                        . " for booting. This can cause problems on upgrades of other boot-related packages."
                         . " Consider removing 'systemd-boot'");
             } else {
                 log_info("systemd-boot used as bootloader and fitting meta-package installed.");
@@ -1929,10 +1929,18 @@ sub check_rrd_migration {
                 . join("\n\t ", $old_files->@*)
                 . "\n\tPlease run the following command manually:\n"
                 . "\t/usr/libexec/proxmox/proxmox-rrd-migration-tool --migrate\n");
+
+            my $cfg = PVE::Storage::config();
+            my @unhandled_storages = grep { $_ =~ m|\.old$| } sort keys $cfg->{ids}->%*;
+            if (scalar(@unhandled_storages) > 0) {
+                my $storage_list_txt = join(", ", @unhandled_storages);
+                log_warn("RRD data for the following storages cannot be migrated"
+                    . " automatically: $storage_list_txt\nRename the RRD files to a name without '.old'"
+                    . " before migration and re-add that suffix after migration.");
+            }
         } else {
             log_pass("No old RRD metric files found, normally this means all have been migrated.");
         }
-
     } else {
         log_info("Check space requirements for RRD migration...");
         # multiplier values taken from KiB sizes of old and new RRD files
@@ -2093,6 +2101,34 @@ sub check_legacy_ipam_files {
     }
 }
 
+sub check_legacy_sysctl_conf {
+    my $fn = "/etc/sysctl.conf";
+    log_info("Checking if the legacy sysctl file '$fn' needs to be migrated to new '/etc/sysctl.d/' path.");
+    if (!-f $fn) {
+        log_pass("Legacy file '$fn' is not present.");
+        return;
+    } elsif ($upgraded) {
+        log_skip("Legacy file '$fn' is present, but system was already upgraded, ignoring.");
+        return;
+    }
+    my $raw = eval { PVE::Tools::file_get_contents($fn); };
+    if ($@) {
+        log_fail("Failed to read '$fn' - $@");
+        return;
+    }
+
+    my @lines = split(/\n/, $raw);
+    for my $line (@lines) {
+        if ($line !~ /^[\s]*(:?$|[#;].*$)/m) {
+            log_warn(
+                "Deprecated config '$fn' contains settings - move them to a dedicated file in '/etc/sysctl.d/'."
+            );
+            return;
+        }
+    }
+    log_pass("Legacy file '$fn' exists but does not contain any settings.");
+}
+
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
     my $ssh_config = eval { PVE::Tools::file_get_contents('/root/.ssh/config') };
@@ -2188,6 +2224,7 @@ sub check_misc {
     check_lvm_autoactivation();
     check_rrd_migration();
     check_legacy_ipam_files();
+    check_legacy_sysctl_conf();
 }
 
 my sub colored_if {
