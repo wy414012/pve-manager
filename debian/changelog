@@ -1,3 +1,9 @@
+pve-manager (8.4.7-2) bookworm; urgency=medium
+
+  * fix:修复提交哈希
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Mon, 04 Aug 2025 18:26:51 +0800
+
 pve-manager (8.4.7-1) bookworm; urgency=medium
 
   * 合并稳定分支
