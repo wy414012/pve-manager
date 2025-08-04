@@ -1832,6 +1832,8 @@ sub check_lvm_autoactivation {
                 . " LVM/LVM-thin guest volumes:\n\n"
                 . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
                 . "\n");
+    } else {
+        log_pass("No volumes were found that could potentially have issues due to the disabling of LVM autoactivation.");
     }
 
     return undef;
@@ -1923,7 +1925,8 @@ sub check_rrd_migration {
             my $cutoff = 29; # avoid spamming the check output to much for bigger setups
             if (!$full_checks && $count > $cutoff + 1) {
                 splice @$old_files, $cutoff + 1;
-                push @$old_files, '... omitted printing ' . ($count - $cutoff) . ' additional files';
+                push @$old_files,
+                    '... omitted printing ' . ($count - $cutoff) . ' additional files';
             }
             log_warn("Found '$count' RRD files that have not yet been migrated to the new schema.\n"
                 . join("\n\t ", $old_files->@*)
@@ -1944,38 +1947,31 @@ sub check_rrd_migration {
     } else {
         log_info("Check space requirements for RRD migration...");
         # multiplier values taken from KiB sizes of old and new RRD files
-        my $rrd_dirs = {
-            nodes => {
-                path => "/var/lib/rrdcached/db/pve2-node",
-                multiplier => 18.1,
-            },
-            guests => {
-                path => "/var/lib/rrdcached/db/pve2-vm",
-                multiplier => 20.2,
-            },
-            storage => {
-                path => "/var/lib/rrdcached/db/pve2-storage",
-                multiplier => 11.14,
-            },
+        my $rrd_usage_multipliers = {
+            'pve2-node' => 18.1,
+            'pve2-vm' => 20.2,
+            'pve2-storage' => 11.14,
         };
 
-        my $size_buffer = 1024 * 1024 * 1024; # at least one GiB of free space should be calculated in
         my $total_size_estimate = 0;
-        for my $type (keys %$rrd_dirs) {
-            my $size = PVE::Tools::du($rrd_dirs->{$type}->{path});
-            $total_size_estimate =
-                $total_size_estimate + ($size * $rrd_dirs->{$type}->{multiplier});
+        for my $dir (sort keys $rrd_usage_multipliers->%*) {
+            my $dir_size = PVE::Tools::du("/var/lib/rrdcached/db/${dir}");
+            $total_size_estimate += $dir_size * $rrd_usage_multipliers->{$dir};
         }
-        my $root_free = PVE::Tools::df('/', 10);
+        my $estimate_gib = $total_size_estimate / 1024. / 1024 / 1024;
+        my $estimate_gib_str = sprintf("%.2f", $estimate_gib);
 
-        if (($total_size_estimate + $size_buffer) >= $root_free->{avail}) {
-            my $estimate_gib = sprintf("%.2f", $total_size_estimate / 1024 / 1024 / 1024);
-            my $free_gib = sprintf("%.2f", $root_free->{avail} / 1024 / 1024 / 1024);
+        my $root_free = PVE::Tools::df('/', 10);
+        if ($total_size_estimate >= $root_free->{avail} - 1<<30) {
+            my $free_gib = sprintf("%.3f", $root_free->{avail} / 1024 / 1024 / 1024);
 
             log_fail("Not enough free space to migrate existing RRD files to the new format!\n"
-                . "Migrating the current RRD files is expected to consume about ${estimate_gib} GiB plus 1 GiB of safety."
+                . "Migrating the current RRD files is expected to consume about ${estimate_gib_str} GiB plus 1 GiB of safety."
                 . " But there is currently only ${free_gib} GiB space on the root file system available.\n"
             );
+        } else {
+            my $size_str = $estimate_gib > 1.0 ? "$estimate_gib_str GiB" : sprintf("%.2f", $estimate_gib * 1024) . " MiB";
+            log_pass("Enough free disk space for increased RRD metric granularity requirements, which is roughly $size_str.");
         }
     }
 }
@@ -2066,16 +2062,13 @@ sub check_legacy_ipam_files {
 
     if (-e $LEGACY_IPAM_DB) {
         if (-e $NEW_IPAM_DB) {
-            log_notice(
-                "Found leftover legacy IPAM DB file in $LEGACY_IPAM_DB.\n"
-                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+."
-            );
+            log_notice("Found leftover legacy IPAM DB file in $LEGACY_IPAM_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+.");
         } else {
-            log_fail(
-                "Found IPAM DB file in $LEGACY_IPAM_DB that has not been migrated!\n"
+            log_fail("Found IPAM DB file in $LEGACY_IPAM_DB that has not been migrated!\n"
                 . "\tFile needs to be migrated to $NEW_IPAM_DB before upgrading. Updating"
-                ." pve-network to the newest version should take care of that!\n"
-                ."\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+                . " pve-network to the newest version should take care of that!\n"
+                . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
             );
         }
     } else {
@@ -2084,16 +2077,13 @@ sub check_legacy_ipam_files {
 
     if (-e $LEGACY_MAC_DB) {
         if (-e $NEW_MAC_DB) {
-            log_notice(
-                "Found leftover legacy MAC DB file in $LEGACY_MAC_DB.\n"
-                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+"
-            );
+            log_notice("Found leftover legacy MAC DB file in $LEGACY_MAC_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+");
         } else {
-            log_fail(
-                "Found MAC DB file in $LEGACY_MAC_DB that has not been migrated!\n"
+            log_fail("Found MAC DB file in $LEGACY_MAC_DB that has not been migrated!\n"
                 . "\tFile needs to be migrated to $NEW_MAC_DB before upgrading. Updating"
-                ." pve-network to the newest version should take care of that!\n"
-                ."\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+                . " pve-network to the newest version should take care of that!\n"
+                . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
             );
         }
     } else {
@@ -2103,7 +2093,9 @@ sub check_legacy_ipam_files {
 
 sub check_legacy_sysctl_conf {
     my $fn = "/etc/sysctl.conf";
-    log_info("Checking if the legacy sysctl file '$fn' needs to be migrated to new '/etc/sysctl.d/' path.");
+    log_info(
+        "Checking if the legacy sysctl file '$fn' needs to be migrated to new '/etc/sysctl.d/' path."
+    );
     if (!-f $fn) {
         log_pass("Legacy file '$fn' is not present.");
         return;
