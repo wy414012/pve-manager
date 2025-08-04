@@ -1603,30 +1603,47 @@ sub check_bootloader {
     log_info("Checking bootloader configuration...");
 
     if (!-d '/sys/firmware/efi') {
+        if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
+            log_info("systemd-boot package installed on legacy-boot system is not necessary, consider remoing it");
+            return;
+        }
         log_skip("System booted in legacy-mode - no need for additional packages");
         return;
     }
 
     if (-f "/etc/kernel/proxmox-boot-uuids") {
         if (!$upgraded) {
-            log_skip("not yet upgraded, no need to check the presence of systemd-boot");
+            log_skip("not yet upgraded, systemd-boot still needed for bootctl");
             return;
         }
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
-            log_pass("bootloader packages installed correctly");
+            log_warn("systemd-boot meta-package installed this will cause issues on upgrades of"
+                ." boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly"
+                ." and remove 'systemd-boot'");
             return;
         }
-        log_warn("proxmox-boot-tool is used for bootloader configuration in uefi mode"
-            . " but the separate systemd-boot package is not installed,"
-            . " initializing new ESPs will not work until the package is installed");
-        return;
-    } elsif (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
-        log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
-            . " new grub versions will not be installed to /boot/efi!"
-            . " Install grub-efi-amd64.");
-        return;
     } else {
-        log_pass("bootloader packages installed correctly");
+        if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
+            my $exit_code = eval {
+                run_command(['bootctl', 'is-installed', '--quiet', '--graceful'], noerr => 1);
+            };
+            if ($exit_code != 0) {
+                log_warn(
+                    "systemd-boot meta-package installed but the system does not seem to use it"
+                        . " for booting. This can cause problems on upgrades of other boot-related packages."
+                        . " Consider removing 'systemd-boot'");
+            } else {
+                log_info("systemd-boot used as bootloader and fitting meta-package installed.");
+                return;
+            }
+        }
+        if (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
+            log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
+                . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64.");
+            return;
+        } else {
+            log_pass("bootloader packages installed correctly");
+        }
     }
 }
 
@@ -1813,6 +1830,8 @@ sub check_lvm_autoactivation {
                 . " LVM/LVM-thin guest volumes:\n\n"
                 . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
                 . "\n");
+    } else {
+        log_pass("No volumes were found that could potentially have issues due to the disabling of LVM autoactivation.");
     }
 
     return undef;
@@ -1911,45 +1930,46 @@ sub check_rrd_migration {
                 . join("\n\t ", $old_files->@*)
                 . "\n\tPlease run the following command manually:\n"
                 . "\t/usr/libexec/proxmox/proxmox-rrd-migration-tool --migrate\n");
+
+            my $cfg = PVE::Storage::config();
+            my @unhandled_storages = grep { $_ =~ m|\.old$| } sort keys $cfg->{ids}->%*;
+            if (scalar(@unhandled_storages) > 0) {
+                my $storage_list_txt = join(", ", @unhandled_storages);
+                log_warn("RRD data for the following storages cannot be migrated"
+                    . " automatically: $storage_list_txt\nRename the RRD files to a name without '.old'"
+                    . " before migration and re-add that suffix after migration.");
+            }
         } else {
             log_pass("No old RRD metric files found, normally this means all have been migrated.");
         }
-
     } else {
         log_info("Check space requirements for RRD migration...");
         # multiplier values taken from KiB sizes of old and new RRD files
-        my $rrd_dirs = {
-            nodes => {
-                path => "/var/lib/rrdcached/db/pve2-node",
-                multiplier => 18.1,
-            },
-            guests => {
-                path => "/var/lib/rrdcached/db/pve2-vm",
-                multiplier => 20.2,
-            },
-            storage => {
-                path => "/var/lib/rrdcached/db/pve2-storage",
-                multiplier => 11.14,
-            },
+        my $rrd_usage_multipliers = {
+            'pve2-node' => 18.1,
+            'pve2-vm' => 20.2,
+            'pve2-storage' => 11.14,
         };
 
-        my $size_buffer = 1024 * 1024 * 1024; # at least one GiB of free space should be calculated in
         my $total_size_estimate = 0;
-        for my $type (keys %$rrd_dirs) {
-            my $size = PVE::Tools::du($rrd_dirs->{$type}->{path});
-            $total_size_estimate =
-                $total_size_estimate + ($size * $rrd_dirs->{$type}->{multiplier});
+        for my $dir (sort keys $rrd_usage_multipliers->%*) {
+            my $dir_size = PVE::Tools::du("/var/lib/rrdcached/db/${dir}");
+            $total_size_estimate += $dir_size * $rrd_usage_multipliers->{$dir};
         }
-        my $root_free = PVE::Tools::df('/', 10);
+        my $estimate_gib = $total_size_estimate / 1024. / 1024 / 1024;
+        my $estimate_gib_str = sprintf("%.2f", $estimate_gib);
 
-        if (($total_size_estimate + $size_buffer) >= $root_free->{avail}) {
-            my $estimate_gib = sprintf("%.2f", $total_size_estimate / 1024 / 1024 / 1024);
-            my $free_gib = sprintf("%.2f", $root_free->{avail} / 1024 / 1024 / 1024);
+        my $root_free = PVE::Tools::df('/', 10);
+        if ($total_size_estimate >= $root_free->{avail} - 1<<30) {
+            my $free_gib = sprintf("%.3f", $root_free->{avail} / 1024 / 1024 / 1024);
 
             log_fail("Not enough free space to migrate existing RRD files to the new format!\n"
-                . "Migrating the current RRD files is expected to consume about ${estimate_gib} GiB plus 1 GiB of safety."
+                . "Migrating the current RRD files is expected to consume about ${estimate_gib_str} GiB plus 1 GiB of safety."
                 . " But there is currently only ${free_gib} GiB space on the root file system available.\n"
             );
+        } else {
+            my $size_str = $estimate_gib > 1.0 ? "$estimate_gib_str GiB" : sprintf("%.2f", $estimate_gib * 1024) . " MiB";
+            log_pass("Enough free disk space for increased RRD metric granularity requirements, which is roughly $size_str.");
         }
     }
 }
@@ -2069,6 +2089,36 @@ sub check_legacy_ipam_files {
     }
 }
 
+sub check_legacy_sysctl_conf {
+    my $fn = "/etc/sysctl.conf";
+    log_info(
+        "Checking if the legacy sysctl file '$fn' needs to be migrated to new '/etc/sysctl.d/' path."
+    );
+    if (!-f $fn) {
+        log_pass("Legacy file '$fn' is not present.");
+        return;
+    } elsif ($upgraded) {
+        log_skip("Legacy file '$fn' is present, but system was already upgraded, ignoring.");
+        return;
+    }
+    my $raw = eval { PVE::Tools::file_get_contents($fn); };
+    if ($@) {
+        log_fail("Failed to read '$fn' - $@");
+        return;
+    }
+
+    my @lines = split(/\n/, $raw);
+    for my $line (@lines) {
+        if ($line !~ /^[\s]*(:?$|[#;].*$)/m) {
+            log_warn(
+                "Deprecated config '$fn' contains settings - move them to a dedicated file in '/etc/sysctl.d/'."
+            );
+            return;
+        }
+    }
+    log_pass("Legacy file '$fn' exists but does not contain any settings.");
+}
+
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
     my $ssh_config = eval { PVE::Tools::file_get_contents('/root/.ssh/config') };
@@ -2164,6 +2214,7 @@ sub check_misc {
     check_lvm_autoactivation();
     check_rrd_migration();
     check_legacy_ipam_files();
+    check_legacy_sysctl_conf();
 }
 
 my sub colored_if {
