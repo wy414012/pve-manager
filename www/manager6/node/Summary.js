@@ -206,7 +206,6 @@ Ext.define('PVE.node.Summary', {
                                         },
                                     },
                                 },
-                                'memavailable',
                                 {
                                     yField: 'memused',
                                     title: gettext('Used'),
@@ -223,7 +222,7 @@ Ext.define('PVE.node.Summary', {
 
                                                 let arc = record.get('arcsize');
                                                 let arcText = '';
-                                                if (Ext.isNumeric(arc)) {
+                                                if (Ext.isNumeric(arc) && arc > 1024 * 1024) {
                                                     let v = Proxmox.Utils.format_size(value - arc);
                                                     arcText = ` (${gettext('Without ZFS ARC')}: ${v})`;
                                                 }
@@ -236,14 +235,24 @@ Ext.define('PVE.node.Summary', {
                                     },
                                 },
                                 'arcsize',
+                                {
+                                    type: 'line',
+                                    fill: false,
+                                    yField: 'memavailable',
+                                    title: gettext('Available'),
+                                    style: {
+                                        lineWidth: 2.5,
+                                        opacity: 1,
+                                    },
+                                },
                             ],
                             fieldTitles: [
                                 gettext('Total'),
-                                gettext('Available'),
                                 gettext('Used'),
                                 gettext('ZFS ARC'),
+                                gettext('Available'),
                             ],
-                            colors: ['#94ae0a', '#94ae0a', '#115fa6', '#7c7474'],
+                            colors: ['#94ae0a', '#115fa6', '#7c7474', '#c4c0c0'],
                             unit: 'bytes',
                             powerOfTwo: true,
                             store: rrdstore,

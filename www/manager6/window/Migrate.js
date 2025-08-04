@@ -237,7 +237,9 @@ Ext.define('PVE.window.Migrate', {
                 });
                 migrateStats = result.data;
             } catch (error) {
-                Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                if (error?.result?.status !== 501) {
+                    Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                }
                 me.fetchingNodeMigrateInfo = false;
                 return;
             }
@@ -392,9 +394,10 @@ Ext.define('PVE.window.Migrate', {
                 if (migration.withConntrackState && !migrateStats['has-dbus-vmstate']) {
                     migration.preconditions.push({
                         text: gettext(
-                            'Cannot migrate conntrack state, source node is lacking support. Active network connections might get dropped.',
+                            'Cannot migrate conntrack state, source node is lacking support.',
                         ),
-                        severity: 'warning',
+                        // user cannot really do anything about this, do not bother with scaring them!
+                        severity: 'info',
                     });
                 }
                 if (migration.withConntrackState && !targetCapabilities['has-dbus-vmstate']) {
@@ -486,7 +489,10 @@ Ext.define('PVE.window.Migrate', {
                 migrateStats = result.data;
                 me.fetchingNodeMigrateInfo = false;
             } catch (error) {
-                Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                if (error?.result?.status !== 501) {
+                    Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                }
+                me.fetchingNodeMigrateInfo = false;
                 return;
             }
 
@@ -676,6 +682,8 @@ Ext.define('PVE.window.Migrate', {
                                 return '<i class="fa fa-exclamation-triangle warning"></i> ';
                             case 'error':
                                 return '<i class="fa fa-times critical"></i>';
+                            case 'info':
+                                return '<i class="fa fa-info-circle info-blue"></i>';
                             default:
                                 return v;
                         }
