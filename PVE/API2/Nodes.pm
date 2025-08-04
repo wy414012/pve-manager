@@ -483,6 +483,10 @@ __PACKAGE__->register_method({
                         type => "integer",
                         description => "The free memory in bytes.",
                     },
+                    available => {
+                        type => "integer",
+                        description => "The available memory in bytes.",
+                    },
                     total => {
                         type => "integer",
                         description => "The total memory in bytes.",
@@ -550,6 +554,7 @@ __PACKAGE__->register_method({
         $res->{memory} = {
             free => $meminfo->{memfree},
             total => $meminfo->{memtotal},
+            available => $meminfo->{memavailable},
             used => $meminfo->{memused},
         };
 
@@ -843,7 +848,7 @@ __PACKAGE__->register_method({
             timeframe => {
                 description => "Specify the time frame you are interested in.",
                 type => 'string',
-                enum => ['hour', 'day', 'week', 'month', 'year'],
+                enum => ['hour', 'day', 'week', 'month', 'year', 'decade'],
             },
             ds => {
                 description => "The list of datasources you want to display.",
@@ -867,9 +872,10 @@ __PACKAGE__->register_method({
     code => sub {
         my ($param) = @_;
 
-        return PVE::RRD::create_rrd_graph(
-            "pve2-node/$param->{node}", $param->{timeframe}, $param->{ds}, $param->{cf},
-        );
+        my $path = "pve-node-9.0/$param->{node}";
+        $path = "pve2-node/$param->{node}" if !-e "/var/lib/rrdcached/db/${path}";
+        return PVE::RRD::create_rrd_graph($path, $param->{timeframe},
+            $param->{ds}, $param->{cf});
 
     },
 });
@@ -890,7 +896,7 @@ __PACKAGE__->register_method({
             timeframe => {
                 description => "Specify the time frame you are interested in.",
                 type => 'string',
-                enum => ['hour', 'day', 'week', 'month', 'year'],
+                enum => ['hour', 'day', 'week', 'month', 'year', 'decade'],
             },
             cf => {
                 description => "The RRD consolidation function",
@@ -910,8 +916,9 @@ __PACKAGE__->register_method({
     code => sub {
         my ($param) = @_;
 
-        return PVE::RRD::create_rrd_data("pve2-node/$param->{node}", $param->{timeframe},
-            $param->{cf});
+        my $path = "pve-node-9.0/$param->{node}";
+        $path = "pve2-node/$param->{node}" if !-e "/var/lib/rrdcached/db/${path}";
+        return PVE::RRD::create_rrd_data($path, $param->{timeframe}, $param->{cf});
     },
 });
 

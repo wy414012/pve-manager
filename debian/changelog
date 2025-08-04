@@ -1,3 +1,109 @@
+pve-manager (9.0.0~19) trixie; urgency=medium
+
+  * ui: ha affinity rules: use single data store and mirror it to child grids,
+    this avoids loading the data twice which then also ensures that they both
+    show the same consistent view of the ruleset.
+
+  * ui: ha affinity rules: various small UX polishing:
+    - give resource rule some more vertical space.
+    - add ID column but hide by default for now.
+    - give resource rules some more vertical space.
+
+  * ui: guest migrate: adapt HA migration checks to new property name also for
+    Containers.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 02 Aug 2025 19:42:57 +0200
+
+pve-manager (9.0.0~18) trixie; urgency=medium
+
+  * sync over 8 to 9 upgrade checks from stable-8 branch.
+
+  * ui: RRD graphs: display PSI as percent again
+
+  * ui: guest migrate: fix logging unexpected errors to developer
+    console.
+
+  * ui: guest migrate: adapt HA migration checks to altered property name
+
+  * ui: sdn: allow sorting the IPAM and DHCP view by guest ID.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 01 Aug 2025 18:41:47 +0200
+
+pve-manager (9.0.0~17) trixie; urgency=medium
+
+  * make Yew based mobile UI package a required dependency and completely drop
+    legacy sencha-touch based mobile UI.
+
+  * ui: ha affinity rules: add CRUD ui for resource-to-resource rules.
+
+  * ui: VM & CT migration: display precondition messages for HA resource
+    affinity blockers.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 11:46:10 +0200
+
+pve-manager (9.0.0~16) trixie; urgency=medium
+
+  * ui: replace HA Groups CRUD with new HA Affinity Rules CRUD.
+
+  * api: route new ha affinity rules endpoints.
+
+  * ui: ha: support new per-resources failback flag.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 09:10:41 +0200
+
+pve-manager (9.0.0~15) trixie; urgency=medium
+
+  * pvestatd: collect and distribute new pve-{type}-9.0 metrics, with new
+    columns (pressure stall information, ZFS ARC, ...) and higher
+    time granularity.
+
+  * ui: node summary: use stacked memory graph with zfs arc.
+
+  * ui: add pressure stall information graphs to node and guest summary views.
+
+  * fix #6068: ui: qemu RRD metrics: improve calculation of actual on-host
+    memory usage by using the sum of the proportional set sizes for all
+    processes inside a VMs resource cgroup slice.
+
+  * post-installation: run promox-rrd-migration-tool to automatically migrate
+    existing data from previous format to new one.
+
+  * 8 to 9 upgrade: add checks for RRD metrics migration and increased on-disk
+    space usage needs.
+
+  * ui: RRD graphs: use title-case for titles.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 06:01:44 +0200
+
+pve-manager (9.0.0~14) trixie; urgency=medium
+
+  * http server: drop legacy yew mobile paths and fix yew mtime path.
+
+  * ui: lxc create wizard: always submit unprivileged field.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 01:11:57 +0200
+
+pve-manager (9.0.0~13) trixie; urgency=medium
+
+  * debian: add tpmfiles.d config to create /run/pve directory.
+
+  * pvestatd: prevent warnings for non-existing network devices.
+
+  * close #2809: replication: use new VM.Replicate privilege.
+
+  * backup: drop 'maxfiles' parameter, it was replaced by the more flexible
+    keep-X prune settings in PVE 7.0 already.
+
+  * api: expose new qemu migration capabilities endpoint.
+
+  * ui: migrate window: add checkbox for migrating VM conntrack state.
+
+  * http server: fix caching of i18n translation files, use mtime.
+
+  * http server: rework location for yew-mobile UI and provide mtimes.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 00:27:24 +0200
+
 pve-manager (9.0.0~12) trixie; urgency=medium
 
   * 8to9 upgrade checks: sync over version from PVE 8.4 stable branch.

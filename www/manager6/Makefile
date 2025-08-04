@@ -143,13 +143,17 @@ JSSRC= 							\
 	window/DirMapEdit.js                            \
 	window/GuestImport.js				\
 	ha/Fencing.js					\
-	ha/GroupEdit.js					\
-	ha/GroupSelector.js				\
-	ha/Groups.js					\
 	ha/ResourceEdit.js				\
 	ha/Resources.js					\
+	ha/RuleEdit.js					\
+	ha/RuleErrorsModal.js				\
+	ha/Rules.js					\
 	ha/Status.js					\
 	ha/StatusView.js				\
+	ha/rules/NodeAffinityRuleEdit.js		\
+	ha/rules/NodeAffinityRules.js			\
+	ha/rules/ResourceAffinityRuleEdit.js		\
+	ha/rules/ResourceAffinityRules.js		\
 	dc/ACLView.js					\
 	dc/ACMEClusterView.js				\
 	dc/AuthEditBase.js				\
@@ -365,8 +369,9 @@ pvemanagerlib.js: .lint-incremental OnlineHelpInfo.js $(JSSRC)
 	cat OnlineHelpInfo.js $(JSSRC) >$@.tmp
 	mv $@.tmp $@
 
+OnlineHelpInfo.js: ARGS ?= $(if $(ALLOW_MISSING),--allow-missing,)
 OnlineHelpInfo.js: $(JSSRC) $(WIDGETKIT)
-	/usr/bin/asciidoc-pve scan-extjs $^ >$@.tmp
+	/usr/bin/asciidoc-pve scan-extjs $(ARGS) $^ >$@.tmp
 	mv $@.tmp $@
 
 .PHONY: install

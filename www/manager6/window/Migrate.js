@@ -29,9 +29,10 @@ Ext.define('PVE.window.Migrate', {
                 allowedNodes: undefined,
                 overwriteLocalResourceCheck: false,
                 hasLocalResources: false,
+                withConntrackState: true,
+                bothHaveDbusVmstate: false,
             },
         },
-
         formulas: {
             setMigrationMode: function (get) {
                 if (get('running')) {
@@ -62,6 +63,10 @@ Ext.define('PVE.window.Migrate', {
                     return false;
                 }
             },
+            conntrackStateCheckboxHidden: (get) =>
+                !get('running') ||
+                get('vmtype') !== 'qemu' ||
+                !get('migration.bothHaveDbusVmstate'),
         },
     },
 
@@ -141,6 +146,10 @@ Ext.define('PVE.window.Migrate', {
                 params.force = 1;
             }
 
+            if (vm.get('migration.bothHaveDbusVmstate') && vm.get('migration.withConntrackState')) {
+                params['with-conntrack-state'] = 1;
+            }
+
             Proxmox.Utils.API2Request({
                 params: params,
                 url:
@@ -195,7 +204,7 @@ Ext.define('PVE.window.Migrate', {
             if (vm.get('vmtype') === 'qemu') {
                 await me.checkQemuPreconditions(resetMigrationPossible);
             } else {
-                me.checkLxcPreconditions(resetMigrationPossible);
+                await me.checkLxcPreconditions(resetMigrationPossible);
             }
 
             // Only allow nodes where the local storage is available in case of offline migration
@@ -227,11 +236,28 @@ Ext.define('PVE.window.Migrate', {
                     method: 'GET',
                 });
                 migrateStats = result.data;
-                me.fetchingNodeMigrateInfo = false;
             } catch (error) {
                 Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                me.fetchingNodeMigrateInfo = false;
                 return;
             }
+
+            const target = me.lookup('pveNodeSelector').value;
+            let targetCapabilities = {};
+
+            try {
+                const { result } = await Proxmox.Async.api2({
+                    url: `/nodes/${target}/capabilities/qemu/migration`,
+                    method: 'GET',
+                });
+                targetCapabilities = result.data;
+            } catch (err) {
+                // Only emit a warning in the case the target node does not (yet) support the
+                // `capabilites/qemu/migration` endpoint and simply treat all features as unsupported.
+                console.warn(`failed to query /capabilites/qemu/migration on '${target}':`, err);
+            }
+
+            me.fetchingNodeMigrateInfo = false;
 
             if (migrateStats.running) {
                 vm.set('running', true);
@@ -242,7 +268,6 @@ Ext.define('PVE.window.Migrate', {
                 migration.possible = true;
             }
             migration.preconditions = [];
-            let target = me.lookup('pveNodeSelector').value;
             let disallowed = migrateStats.not_allowed_nodes?.[target] ?? {};
 
             if (migrateStats.allowed_nodes && !vm.get('running')) {
@@ -361,13 +386,168 @@ Ext.define('PVE.window.Migrate', {
                 });
             }
 
+            migration.bothHaveDbusVmstate =
+                migrateStats['has-dbus-vmstate'] && targetCapabilities['has-dbus-vmstate'];
+            if (vm.get('running')) {
+                if (migration.withConntrackState && !migrateStats['has-dbus-vmstate']) {
+                    migration.preconditions.push({
+                        text: gettext(
+                            'Cannot migrate conntrack state, source node is lacking support. Active network connections might get dropped.',
+                        ),
+                        severity: 'warning',
+                    });
+                }
+                if (migration.withConntrackState && !targetCapabilities['has-dbus-vmstate']) {
+                    migration.preconditions.push({
+                        text: gettext(
+                            'Cannot migrate conntrack state, target node is lacking support. Active network connections might get dropped.',
+                        ),
+                        severity: 'warning',
+                    });
+                }
+
+                if (migration.bothHaveDbusVmstate && !migration.withConntrackState) {
+                    migration.preconditions.push({
+                        text: gettext(
+                            'Conntrack state migration disabled. Active network connections might get dropped.',
+                        ),
+                        severity: 'warning',
+                    });
+                }
+            }
+
+            let blockingHAResources = disallowed['blocking-ha-resources'] ?? [];
+            if (blockingHAResources.length) {
+                migration.possible = false;
+
+                for (const { sid, cause } of blockingHAResources) {
+                    let reasonText;
+                    if (cause === 'resource-affinity') {
+                        reasonText = Ext.String.format(
+                            gettext(
+                                'HA resource {0} with negative affinity to VM on selected target node',
+                            ),
+                            sid,
+                        );
+                    } else {
+                        reasonText = Ext.String.format(
+                            gettext('blocking HA resource {0} on selected target node'),
+                            sid,
+                        );
+                    }
+
+                    migration.preconditions.push({
+                        severity: 'error',
+                        text: Ext.String.format(
+                            gettext('Cannot migrate VM, because {0}.'),
+                            reasonText,
+                        ),
+                    });
+                }
+            }
+
+            let dependentHAResources = migrateStats['dependent-ha-resources'];
+            if (dependentHAResources !== undefined) {
+                for (const sid of dependentHAResources) {
+                    const text = Ext.String.format(
+                        gettext(
+                            'HA resource {0} with positive affinity to VM is also migrated to selected target node.',
+                        ),
+                        sid,
+                    );
+
+                    migration.preconditions.push({ text, severity: 'warning' });
+                }
+            }
+
             vm.set('migration', migration);
         },
-        checkLxcPreconditions: function (resetMigrationPossible) {
-            let vm = this.getViewModel();
+        checkLxcPreconditions: async function (resetMigrationPossible) {
+            let me = this;
+            let vm = me.getViewModel();
+            let migrateStats;
+
             if (vm.get('running')) {
                 vm.set('migration.mode', 'restart');
             }
+
+            try {
+                if (
+                    me.fetchingNodeMigrateInfo &&
+                    me.fetchingNodeMigrateInfo === vm.get('nodename')
+                ) {
+                    return;
+                }
+                me.fetchingNodeMigrateInfo = vm.get('nodename');
+                let { result } = await Proxmox.Async.api2({
+                    url: `/nodes/${vm.get('nodename')}/${vm.get('vmtype')}/${vm.get('vmid')}/migrate`,
+                    method: 'GET',
+                });
+                migrateStats = result.data;
+                me.fetchingNodeMigrateInfo = false;
+            } catch (error) {
+                Ext.Msg.alert(Proxmox.Utils.errorText, error.htmlStatus);
+                return;
+            }
+
+            if (migrateStats.running) {
+                vm.set('running', true);
+            }
+
+            // Get migration object from viewmodel to prevent to many bind callbacks
+            let migration = vm.get('migration');
+            if (resetMigrationPossible) {
+                migration.possible = true;
+            }
+            migration.preconditions = [];
+            let targetNode = me.lookup('pveNodeSelector').value;
+            let disallowed = migrateStats['not-allowed-nodes']?.[targetNode] ?? {};
+
+            let blockingHAResources = disallowed['blocking-ha-resources'] ?? [];
+            if (blockingHAResources.length) {
+                migration.possible = false;
+
+                for (const { sid, cause } of blockingHAResources) {
+                    let reasonText;
+                    if (cause === 'resource-affinity') {
+                        reasonText = Ext.String.format(
+                            gettext(
+                                'HA resource {0} with negative affinity to container on selected target node',
+                            ),
+                            sid,
+                        );
+                    } else {
+                        reasonText = Ext.String.format(
+                            gettext('blocking HA resource {0} on selected target node'),
+                            sid,
+                        );
+                    }
+
+                    migration.preconditions.push({
+                        severity: 'error',
+                        text: Ext.String.format(
+                            gettext('Cannot migrate container, because {0}.'),
+                            reasonText,
+                        ),
+                    });
+                }
+            }
+
+            let dependentHAResources = migrateStats['dependent-ha-resources'];
+            if (dependentHAResources !== undefined) {
+                for (const sid of dependentHAResources) {
+                    const text = Ext.String.format(
+                        gettext(
+                            'HA resource {0} with positive affinity to container is also migrated to selected target node.',
+                        ),
+                        sid,
+                    );
+
+                    migration.preconditions.push({ text, severity: 'warning' });
+                }
+            }
+
+            vm.set('migration', migration);
         },
     },
 
@@ -448,6 +628,27 @@ Ext.define('PVE.window.Migrate', {
                             bind: {
                                 hidden: '{setLocalResourceCheckboxHidden}',
                                 value: '{migration.overwriteLocalResourceCheck}',
+                            },
+                            listeners: {
+                                change: {
+                                    fn: 'checkMigratePreconditions',
+                                    extraArg: true,
+                                },
+                            },
+                        },
+                        {
+                            xtype: 'proxmoxcheckbox',
+                            name: 'withConntrackState',
+                            fieldLabel: gettext('Conntrack state'),
+                            autoEl: {
+                                tag: 'div',
+                                'data-qtip': gettext(
+                                    'Enables live migration of conntrack entries for this VM.',
+                                ),
+                            },
+                            bind: {
+                                hidden: '{conntrackStateCheckboxHidden}',
+                                value: '{migration.withConntrackState}',
                             },
                             listeners: {
                                 change: {

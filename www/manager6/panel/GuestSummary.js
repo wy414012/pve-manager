@@ -30,6 +30,30 @@ Ext.define('PVE.guest.Summary', {
         var template = !!me.pveSelNode.data.template;
         var rstore = me.statusStore;
 
+        let hideMemhostStateKey = 'pve-vm-hide-memhost';
+        let sp = Ext.state.Manager.getProvider();
+
+        let memoryFields = [
+            {
+                type: 'area',
+                yField: ['mem', 'memfree-capped'],
+                title: [gettext('Used'), gettext('Free')],
+            },
+        ];
+        if (type === 'qemu') {
+            memoryFields.push({
+                type: 'line',
+                fill: false,
+                yField: 'memhost',
+                title: gettext('Host memory usage'),
+                hidden: sp.get(hideMemhostStateKey, true),
+                style: {
+                    lineWidth: 2.5,
+                    opacity: 1,
+                },
+            });
+        }
+
         var items = [
             {
                 xtype: template ? 'pveTemplateStatusView' : 'pveGuestStatusView',
@@ -71,7 +95,7 @@ Ext.define('PVE.guest.Summary', {
             items.push(
                 {
                     xtype: 'proxmoxRRDChart',
-                    title: gettext('CPU usage'),
+                    title: gettext('CPU Usage'),
                     pveSelNode: me.pveSelNode,
                     fields: ['cpu'],
                     fieldTitles: [gettext('CPU usage')],
@@ -80,19 +104,26 @@ Ext.define('PVE.guest.Summary', {
                 },
                 {
                     xtype: 'proxmoxRRDChart',
-                    title: gettext('Memory usage'),
+                    title: gettext('Memory Usage'),
                     pveSelNode: me.pveSelNode,
-                    fields: ['maxmem', 'mem'],
-                    fieldTitles: [gettext('Total'), gettext('RAM usage')],
+                    fields: memoryFields,
+                    colors: ['#115fa6', '#94ae0a', '#c4c0c0'],
                     unit: 'bytes',
                     powerOfTwo: true,
                     store: rrdstore,
+                    onLegendChange: function (_legend, record, _, seriesIndex) {
+                        if (seriesIndex === 2) {
+                            // third data series is clicked -> hostmem
+                            sp.set(hideMemhostStateKey, record.data.disabled);
+                        }
+                    },
                 },
                 {
                     xtype: 'proxmoxRRDChart',
-                    title: gettext('Network traffic'),
+                    title: gettext('Network Traffic'),
                     pveSelNode: me.pveSelNode,
                     fields: ['netin', 'netout'],
+                    fieldTitles: [gettext('Incoming'), gettext('Outgoing')],
                     store: rrdstore,
                 },
                 {
@@ -100,7 +131,38 @@ Ext.define('PVE.guest.Summary', {
                     title: gettext('Disk IO'),
                     pveSelNode: me.pveSelNode,
                     fields: ['diskread', 'diskwrite'],
+                    fieldTitles: [gettext('Reads'), gettext('Writes')],
                     store: rrdstore,
+                },
+                {
+                    xtype: 'proxmoxRRDChart',
+                    title: gettext('CPU Pressure Stall'),
+                    pveSelNode: me.pveSelNode,
+                    fieldTitles: ['Some', 'Full'],
+                    fields: ['pressurecpusome', 'pressurecpufull'],
+                    colors: ['#FFD13E', '#A61120'],
+                    store: rrdstore,
+                    unit: 'percent',
+                },
+                {
+                    xtype: 'proxmoxRRDChart',
+                    title: gettext('IO Pressure Stall'),
+                    pveSelNode: me.pveSelNode,
+                    fieldTitles: ['Some', 'Full'],
+                    fields: ['pressureiosome', 'pressureiofull'],
+                    colors: ['#FFD13E', '#A61120'],
+                    store: rrdstore,
+                    unit: 'percent',
+                },
+                {
+                    xtype: 'proxmoxRRDChart',
+                    title: gettext('Memory Pressure Stall'),
+                    pveSelNode: me.pveSelNode,
+                    fieldTitles: ['Some', 'Full'],
+                    fields: ['pressurememorysome', 'pressurememoryfull'],
+                    colors: ['#FFD13E', '#A61120'],
+                    store: rrdstore,
+                    unit: 'percent',
                 },
             );
         }
@@ -134,7 +196,6 @@ Ext.define('PVE.guest.Summary', {
             rrdstore.startUpdate();
             me.on('destroy', rrdstore.stopUpdate);
         }
-        let sp = Ext.state.Manager.getProvider();
         me.mon(sp, 'statechange', function (provider, key, value) {
             if (key !== 'summarycolumns') {
                 return;

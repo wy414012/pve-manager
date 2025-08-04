@@ -3,21 +3,23 @@ package PVE::API2::Replication;
 use warnings;
 use strict;
 
-use PVE::JSONSchema qw(get_standard_option);
-use PVE::RPCEnvironment;
+use PVE::Cluster;
+use PVE::Exception qw(raise_perm_exc);
 use PVE::Format qw(render_timestamp);
-use PVE::ProcFSTools;
-
-use PVE::ReplicationConfig;
-use PVE::ReplicationState;
-use PVE::Replication;
-use PVE::QemuConfig;
-use PVE::QemuServer;
+use PVE::INotify;
+use PVE::JSONSchema qw(get_standard_option);
 use PVE::LXC::Config;
 use PVE::LXC;
 use PVE::Notify;
-
+use PVE::ProcFSTools;
+use PVE::QemuConfig;
+use PVE::QemuServer;
+use PVE::ReplicationConfig;
+use PVE::ReplicationState;
+use PVE::Replication;
 use PVE::RESTHandler;
+use PVE::RPCEnvironment;
+use PVE::Tools;
 
 use base qw(PVE::RESTHandler);
 
@@ -234,7 +236,7 @@ __PACKAGE__->register_method({
             my $data = $extract_job_status->($jobs->{$id}, $id);
             my $guest = $data->{guest};
             next if defined($param->{guest}) && $guest != $param->{guest};
-            next if !$rpcenv->check($authuser, "/vms/$guest", ['VM.Audit']);
+            next if !$rpcenv->check($authuser, "/vms/$guest", ['VM.Audit'], 1);
             push @$res, $data;
         }
 
@@ -309,7 +311,7 @@ __PACKAGE__->register_method({
         my $data = $extract_job_status->($jobcfg, $jobid);
         my $guest = $data->{guest};
 
-        raise_perm_exc() if !$rpcenv->check($authuser, "/vms/$guest", ['VM.Audit']);
+        $rpcenv->check($authuser, "/vms/$guest", ['VM.Audit']);
 
         return $data;
     },
@@ -379,8 +381,8 @@ __PACKAGE__->register_method({
         my $vmid = $data->{guest};
         raise_perm_exc()
             if (!(
-                $rpcenv->check($authuser, "/vms/$vmid", ['VM.Audit'])
-                || $rpcenv->check($authuser, "/nodes/$node", ['Sys.Audit'])
+                $rpcenv->check($authuser, "/vms/$vmid", ['VM.Audit'], 1)
+                || $rpcenv->check($authuser, "/nodes/$node", ['Sys.Audit'], 1)
             ));
 
         my ($count, $lines) =
@@ -400,7 +402,8 @@ __PACKAGE__->register_method({
     proxyto => 'node',
     protected => 1,
     permissions => {
-        check => ['perm', '/storage', ['Datastore.Allocate']],
+        description => "Requires the VM.Replicate permission on /vms/<vmid>.",
+        user => 'all',
     },
     parameters => {
         additionalProperties => 0,
@@ -415,7 +418,12 @@ __PACKAGE__->register_method({
     code => sub {
         my ($param) = @_;
 
+        my $rpcenv = PVE::RPCEnvironment::get();
+        my $authuser = $rpcenv->get_user();
+
         my $jobid = $param->{id};
+        my ($vmid) = PVE::ReplicationConfig::parse_replication_job_id($jobid);
+        $rpcenv->check($authuser, "/vms/$vmid", ['VM.Replicate']);
 
         my $cfg = PVE::ReplicationConfig->new();
         my $jobcfg = $cfg->{ids}->{$jobid};

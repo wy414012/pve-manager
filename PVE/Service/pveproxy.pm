@@ -54,8 +54,8 @@ my $basedirs = {
     i18n => '/usr/share/pve-i18n',
     manager => '/usr/share/pve-manager',
     novnc => '/usr/share/novnc-pve',
-    sencha_touch => '/usr/share/javascript/sencha-touch',
-    yew_mobile => '/usr/share/javascript/pve-yew-mobile-gui',
+    yew_mobile => '/usr/share/pve-yew-mobile-gui',
+    i18n_yew => '/usr/share/pve-yew-mobile-i18n',
     widgettoolkit => '/usr/share/javascript/proxmox-widget-toolkit',
     xtermjs => '/usr/share/pve-xtermjs',
 };
@@ -88,13 +88,12 @@ sub init {
     add_dirs($dirs, '/pve2/images/' => "$basedirs->{manager}/images/");
     add_dirs($dirs, '/pve2/js/' => "$basedirs->{manager}/js/");
     add_dirs($dirs, '/pve2/locale/', "$basedirs->{i18n}/");
-    add_dirs($dirs, '/pve2/sencha-touch/', "$basedirs->{sencha_touch}/");
-    add_dirs($dirs, '/pve2/yew-mobile/', "$basedirs->{yew_mobile}/");
-    add_dirs($dirs, '/pve2/touch/', "$basedirs->{manager}/touch/");
     add_dirs($dirs, '/pwt/css/' => "$basedirs->{widgettoolkit}/css/");
     add_dirs($dirs, '/pwt/images/' => "$basedirs->{widgettoolkit}/images/");
     add_dirs($dirs, '/pwt/themes/' => "$basedirs->{widgettoolkit}/themes/");
     add_dirs($dirs, '/xtermjs/' => "$basedirs->{xtermjs}/");
+    add_dirs($dirs, '/yew-mobile/', "$basedirs->{yew_mobile}/");
+    add_dirs($dirs, '/yew-mobile/i18n/', "$basedirs->{i18n_yew}/");
 
     $self->{server_config} = {
         title => 'Proxmox VE API',
@@ -194,9 +193,16 @@ sub is_phone {
     return 0;
 }
 
-# NOTE: Requests to those pages are not authenticated
-# so we must be very careful here
+my sub get_path_mtime {
+    my ($path) = @_;
 
+    my @stat_res = stat($path) or $!{ENOENT} or die "failed to stat '$path' - $!\n";
+    my $mtime = $stat_res[9];
+
+    return $mtime;
+}
+
+# NOTE: Requests to those pages are not authenticated so we must be very careful here
 sub get_index {
     my ($nodename, $server, $r, $args) = @_;
 
@@ -251,6 +257,13 @@ sub get_index {
     my $wtversionraw = PVE::Tools::file_read_firstline("$basedirs->{widgettoolkit}/proxmoxlib.js");
     my $wtversion = $wtversionraw =~ m|^// (.*)$| ? $1 : '';
 
+    # while we could use the actual pkg version (e.g., shipped as pkg-version file in each
+    # respective package's /usr/share/<pkg> folder, this way it should also work when using make
+    # install to directly install to local root filesystem.
+    my $i18n_js_mtime = get_path_mtime('/usr/share/pve-i18n');
+    my $i18n_yew_mtime = get_path_mtime('/usr/share/pve-yew-mobile-i18n');
+    my $ui_yew_mtime = get_path_mtime('/usr/share/pve-yew-mobile-gui');
+
     my $debug = $server->{debug};
     if (exists $args->{debug}) {
         $debug = !defined($args->{debug}) || $args->{debug};
@@ -268,6 +281,10 @@ sub get_index {
         wtversion => $wtversion,
         theme => $theme,
         consenttext => $consent_text,
+        i18n_js_mtime => $i18n_js_mtime,
+        i18n_yew_mobile_mtime => $i18n_yew_mtime,
+        yew_mobile_mtime => $ui_yew_mtime,
+        yew_mobile_base_path => '/yew-mobile',
     };
 
     # by default, load the normal index
@@ -278,9 +295,7 @@ sub get_index {
     } elsif ($xtermjs) {
         $dir = $basedirs->{xtermjs};
     } elsif ($mobile) {
-        $dir = "$basedirs->{manager}/touch";
-        # prefer new Yew based mobile UI if it's installed
-        $dir = "$basedirs->{yew_mobile}" if -d $basedirs->{yew_mobile};
+        $dir = "$basedirs->{yew_mobile}";
     }
 
     my $page = '';

@@ -22,7 +22,7 @@
     [%- END -%]
 
     [% IF langfile %]
-    <script type='text/javascript' src='/pve2/locale/pve-lang-[% lang %].js?ver=[% version %]'></script>
+    <script type='text/javascript' src='/pve2/locale/pve-lang-[% lang %].js?v=[% i18n_js_mtime %]'></script>
     [%- ELSE %]
     <script type='text/javascript'>
         function gettext(message) { return message; }
@@ -40,12 +40,12 @@
     <script type="text/javascript" src="/qrcode.min.js"></script>
     <script type="text/javascript">
     Proxmox = {
-	Setup: { auth_cookie_name: 'PVEAuthCookie' },
-	defaultLang: '[% lang %]',
-	NodeName: '[% nodename %]',
-	UserName: '[% username %]',
-	CSRFPreventionToken: '[% token %]',
-	ConsentText: '[% consenttext %]'
+        Setup: { auth_cookie_name: 'PVEAuthCookie' },
+        defaultLang: '[% lang %]',
+        NodeName: '[% nodename %]',
+        UserName: '[% username %]',
+        CSRFPreventionToken: '[% token %]',
+        ConsentText: '[% consenttext %]'
     };
     </script>
     <script type="text/javascript" src="/proxmoxlib.js?ver=[% wtversion %]"></script>

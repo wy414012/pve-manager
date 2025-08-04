@@ -44,6 +44,8 @@ my $nodename = PVE::INotify::nodename();
 
 my $upgraded = 0; # set in check_pve_packages
 
+my $full_checks = !!0; # set by CLI --full parameter
+
 sub setup_environment {
     PVE::RPCEnvironment->setup_default_cli_env();
 }
@@ -1870,6 +1872,88 @@ sub check_bridge_mtu {
     }
 }
 
+sub check_rrd_migration {
+    if (-e "/var/lib/rrdcached/db/pve-node-9.0") {
+        log_info("Check post RRD metrics data format migration situation...");
+
+        my $old_files = [];
+        my $record_old = sub {
+            my $file = shift;
+            $file =~ s!^/var/lib/rrdcached/db/!!;
+            push @$old_files, $file;
+        };
+        eval {
+            run_command(
+                [
+                    'find',
+                    '/var/lib/rrdcached/db',
+                    '-path',
+                    '*pve2-*',
+                    '-type',
+                    'f',
+                    '!',
+                    '-name',
+                    '*.old',
+                ],
+                outfunc => $record_old,
+                noerr => 1,
+            );
+        };
+
+        if (my $count = scalar($old_files->@*)) {
+            my $cutoff = 29; # avoid spamming the check output to much for bigger setups
+            if (!$full_checks && $count > $cutoff + 1) {
+                splice @$old_files, $cutoff + 1;
+                push @$old_files,
+                    '... omitted printing ' . ($count - $cutoff) . ' additional files';
+            }
+            log_warn("Found '$count' RRD files that have not yet been migrated to the new schema.\n"
+                . join("\n\t ", $old_files->@*)
+                . "\n\tPlease run the following command manually:\n"
+                . "\t/usr/libexec/proxmox/proxmox-rrd-migration-tool --migrate\n");
+        } else {
+            log_pass("No old RRD metric files found, normally this means all have been migrated.");
+        }
+
+    } else {
+        log_info("Check space requirements for RRD migration...");
+        # multiplier values taken from KiB sizes of old and new RRD files
+        my $rrd_dirs = {
+            nodes => {
+                path => "/var/lib/rrdcached/db/pve2-node",
+                multiplier => 18.1,
+            },
+            guests => {
+                path => "/var/lib/rrdcached/db/pve2-vm",
+                multiplier => 20.2,
+            },
+            storage => {
+                path => "/var/lib/rrdcached/db/pve2-storage",
+                multiplier => 11.14,
+            },
+        };
+
+        my $size_buffer = 1024 * 1024 * 1024; # at least one GiB of free space should be calculated in
+        my $total_size_estimate = 0;
+        for my $type (keys %$rrd_dirs) {
+            my $size = PVE::Tools::du($rrd_dirs->{$type}->{path});
+            $total_size_estimate =
+                $total_size_estimate + ($size * $rrd_dirs->{$type}->{multiplier});
+        }
+        my $root_free = PVE::Tools::df('/', 10);
+
+        if (($total_size_estimate + $size_buffer) >= $root_free->{avail}) {
+            my $estimate_gib = sprintf("%.2f", $total_size_estimate / 1024 / 1024 / 1024);
+            my $free_gib = sprintf("%.2f", $root_free->{avail} / 1024 / 1024 / 1024);
+
+            log_fail("Not enough free space to migrate existing RRD files to the new format!\n"
+                . "Migrating the current RRD files is expected to consume about ${estimate_gib} GiB plus 1 GiB of safety."
+                . " But there is currently only ${free_gib} GiB space on the root file system available.\n"
+            );
+        }
+    }
+}
+
 sub check_virtual_guests {
     print_header("VIRTUAL GUEST CHECKS");
 
@@ -1943,6 +2027,46 @@ sub check_virtual_guests {
     }
 
     check_qemu_machine_versions();
+}
+
+my $LEGACY_IPAM_DB = "/etc/pve/priv/ipam.db";
+my $NEW_IPAM_DB = "/etc/pve/sdn/pve-ipam-state.json";
+
+my $LEGACY_MAC_DB = "/etc/pve/priv/macs.db";
+my $NEW_MAC_DB = "/etc/pve/sdn/mac-cache.json";
+
+sub check_legacy_ipam_files {
+    log_info("Checking for IPAM DB files that have not yet been migrated.");
+
+    if (-e $LEGACY_IPAM_DB) {
+        if (-e $NEW_IPAM_DB) {
+            log_notice("Found leftover legacy IPAM DB file in $LEGACY_IPAM_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+.");
+        } else {
+            log_fail("Found IPAM DB file in $LEGACY_IPAM_DB that has not been migrated!\n"
+                . "\tFile needs to be migrated to $NEW_IPAM_DB before upgrading. Updating"
+                . " pve-network to the newest version should take care of that!\n"
+                . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+            );
+        }
+    } else {
+        log_pass("No legacy IPAM DB found.");
+    }
+
+    if (-e $LEGACY_MAC_DB) {
+        if (-e $NEW_MAC_DB) {
+            log_notice("Found leftover legacy MAC DB file in $LEGACY_MAC_DB.\n"
+                . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+");
+        } else {
+            log_fail("Found MAC DB file in $LEGACY_MAC_DB that has not been migrated!\n"
+                . "\tFile needs to be migrated to $NEW_MAC_DB before upgrading. Updating"
+                . " pve-network to the newest version should take care of that!\n"
+                . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
+            );
+        }
+    } else {
+        log_pass("No legacy MAC DB found.");
+    }
 }
 
 sub check_misc {
@@ -2038,6 +2162,8 @@ sub check_misc {
     check_legacy_notification_sections();
     check_legacy_backup_job_options();
     check_lvm_autoactivation();
+    check_rrd_migration();
+    check_legacy_ipam_files();
 }
 
 my sub colored_if {
@@ -2064,6 +2190,8 @@ __PACKAGE__->register_method({
     returns => { type => 'null' },
     code => sub {
         my ($param) = @_;
+
+        $full_checks = !!$param->{full};
 
         my $kernel_cli = PVE::Tools::file_get_contents('/proc/cmdline');
         if ($kernel_cli =~ /systemd.unified_cgroup_hierarchy=0/) {

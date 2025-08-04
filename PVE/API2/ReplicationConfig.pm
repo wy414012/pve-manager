@@ -3,14 +3,17 @@ package PVE::API2::ReplicationConfig;
 use warnings;
 use strict;
 
-use PVE::Tools qw(extract_param);
-use PVE::Exception qw(raise_perm_exc raise_param_exc);
-use PVE::JSONSchema qw(get_standard_option);
-use PVE::RPCEnvironment;
-use PVE::ReplicationConfig;
 use PVE::Cluster;
-
+use PVE::Exception qw(raise_param_exc);
+use PVE::JSONSchema qw(get_standard_option);
+use PVE::ReplicationConfig;
 use PVE::RESTHandler;
+use PVE::RPCEnvironment;
+use PVE::SectionConfig;
+use PVE::Storage;
+use PVE::Tools qw(extract_param);
+
+use PVE::API2::Replication;
 
 use base qw(PVE::RESTHandler);
 
@@ -87,7 +90,7 @@ __PACKAGE__->register_method({
 
         my $vmid = $data->{guest};
 
-        raise_perm_exc() if !$rpcenv->check($authuser, "/vms/$vmid", ['VM.Audit']);
+        $rpcenv->check($authuser, "/vms/$vmid", ['VM.Audit']);
 
         $data->{id} = $param->{id};
 
@@ -104,12 +107,16 @@ __PACKAGE__->register_method({
     method => 'POST',
     description => "Create a new replication job",
     permissions => {
-        check => ['perm', '/storage', ['Datastore.Allocate']],
+        description => "Requires the VM.Replicate permission on /vms/<vmid>.",
+        user => 'all',
     },
     parameters => PVE::ReplicationConfig->createSchema(),
     returns => { type => 'null' },
     code => sub {
         my ($param) = @_;
+
+        my $rpcenv = PVE::RPCEnvironment::get();
+        my $authuser = $rpcenv->get_user();
 
         my $type = extract_param($param, 'type');
         my $plugin = PVE::ReplicationConfig->lookup($type);
@@ -117,6 +124,7 @@ __PACKAGE__->register_method({
 
         # extract guest ID from job ID
         my ($guest) = PVE::ReplicationConfig::parse_replication_job_id($id);
+        $rpcenv->check($authuser, "/vms/$guest", ['VM.Replicate']);
 
         my $nodelist = PVE::Cluster::get_members();
         my $vmlist = PVE::Cluster::get_vmlist();
@@ -173,16 +181,23 @@ __PACKAGE__->register_method({
     method => 'PUT',
     description => "Update replication job configuration.",
     permissions => {
-        check => ['perm', '/storage', ['Datastore.Allocate']],
+        description => "Requires the VM.Replicate permission on /vms/<vmid>.",
+        user => 'all',
     },
     parameters => PVE::ReplicationConfig->updateSchema(),
     returns => { type => 'null' },
     code => sub {
         my ($param) = @_;
 
+        my $rpcenv = PVE::RPCEnvironment::get();
+        my $authuser = $rpcenv->get_user();
+
         my $id = extract_param($param, 'id');
         my $digest = extract_param($param, 'digest');
         my $delete = extract_param($param, 'delete');
+
+        my ($vmid) = PVE::ReplicationConfig::parse_replication_job_id($id);
+        $rpcenv->check($authuser, "/vms/$vmid", ['VM.Replicate']);
 
         my $code = sub {
             my $cfg = PVE::ReplicationConfig->new();
@@ -228,7 +243,8 @@ __PACKAGE__->register_method({
     method => 'DELETE',
     description => "Mark replication job for removal.",
     permissions => {
-        check => ['perm', '/storage', ['Datastore.Allocate']],
+        description => "Requires the VM.Replicate permission on /vms/<vmid>.",
+        user => 'all',
     },
     parameters => {
         additionalProperties => 0,
@@ -253,11 +269,15 @@ __PACKAGE__->register_method({
         my ($param) = @_;
 
         my $rpcenv = PVE::RPCEnvironment::get();
+        my $authuser = $rpcenv->get_user();
+
+        my $id = extract_param($param, 'id');
+        my ($vmid) = PVE::ReplicationConfig::parse_replication_job_id($id);
+        $rpcenv->check($authuser, "/vms/$vmid", ['VM.Replicate']);
 
         my $code = sub {
             my $cfg = PVE::ReplicationConfig->new();
 
-            my $id = $param->{id};
             if ($param->{force}) {
                 raise_param_exc({ 'keep' => "conflicts with parameter 'force'" })
                     if $param->{keep};

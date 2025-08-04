@@ -1,5 +1,5 @@
 include ../defines.mk
-SUBDIRS = images css manager6 mobile
+SUBDIRS = images css manager6
 
 all:
 
@@ -12,6 +12,10 @@ install:
 
 .PHONY: check
 check:
+	$(MAKE) -C manager6 $@
+
+.PHONY: tidy
+tidy:
 	$(MAKE) -C manager6 $@
 
 .PHONY: clean
