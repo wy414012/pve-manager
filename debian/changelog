@@ -1,3 +1,9 @@
+pve-manager (8.4.8-1) bookworm; urgency=medium
+
+  * 合并修复补丁
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 05 Aug 2025 09:37:01 +0800
+
 pve-manager (8.4.7-4) bookworm; urgency=medium
 
   * 移除订阅检测

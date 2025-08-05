@@ -1833,7 +1833,9 @@ sub check_lvm_autoactivation {
                 . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
                 . "\n");
     } else {
-        log_pass("No volumes were found that could potentially have issues due to the disabling of LVM autoactivation.");
+        log_pass(
+            "No volumes were found that could potentially have issues due to the disabling of LVM autoactivation."
+        );
     }
 
     return undef;
@@ -1962,7 +1964,7 @@ sub check_rrd_migration {
         my $estimate_gib_str = sprintf("%.2f", $estimate_gib);
 
         my $root_free = PVE::Tools::df('/', 10);
-        if ($total_size_estimate >= $root_free->{avail} - 1<<30) {
+        if ($total_size_estimate >= $root_free->{avail} - 1 << 30) {
             my $free_gib = sprintf("%.3f", $root_free->{avail} / 1024 / 1024 / 1024);
 
             log_fail("Not enough free space to migrate existing RRD files to the new format!\n"
@@ -1970,8 +1972,13 @@ sub check_rrd_migration {
                 . " But there is currently only ${free_gib} GiB space on the root file system available.\n"
             );
         } else {
-            my $size_str = $estimate_gib > 1.0 ? "$estimate_gib_str GiB" : sprintf("%.2f", $estimate_gib * 1024) . " MiB";
-            log_pass("Enough free disk space for increased RRD metric granularity requirements, which is roughly $size_str.");
+            my $size_str =
+                $estimate_gib > 1.0
+                ? "$estimate_gib_str GiB"
+                : sprintf("%.2f", $estimate_gib * 1024) . " MiB";
+            log_pass(
+                "Enough free disk space for increased RRD metric granularity requirements, which is roughly $size_str."
+            );
         }
     }
 }
@@ -2121,6 +2128,46 @@ sub check_legacy_sysctl_conf {
     log_pass("Legacy file '$fn' exists but does not contain any settings.");
 }
 
+sub check_cpu_microcode_package {
+    log_info("Checking if matching CPU microcode package is installed.");
+
+    open(my $CPUINFO_FD, '<', '/proc/cpuinfo') or log_fail("failed to open '/proc/cpuinfo' - $!\n");
+    return if !defined($CPUINFO_FD);
+
+    my $vendor_id;
+    while (my $line = <$CPUINFO_FD>) {
+        if ($line =~ /^vendor_id\s*:\s*(GenuineIntel|AuthenticAMD)/) {
+            $vendor_id = $1;
+        } elsif ($line eq "") {
+            last;
+        }
+    }
+    close($CPUINFO_FD);
+
+    if (!defined($vendor_id)) {
+        log_warn("failed to parse CPU vendor ID from '/proc/cpuinfo'");
+        return;
+    }
+    my $microcode_pkg;
+    if ($vendor_id eq 'AuthenticAMD') {
+        $microcode_pkg = 'amd64-microcode';
+    } elsif ($vendor_id eq 'GenuineIntel') {
+        $microcode_pkg = 'intel-microcode';
+    } else {
+        log_warn("unexpected CPU vendor ID '$vendor_id'");
+        return;
+    }
+
+    if (defined($get_pkg->($microcode_pkg))) {
+        log_pass("Found matching CPU microcode package '$microcode_pkg' installed.");
+    } else {
+        log_warn(
+            "The matching CPU microcode package '$microcode_pkg' could not be found! Consider"
+                . " installing it to receive the latest security and bug fixes for your CPU.\n"
+                . "\tapt install $microcode_pkg");
+    }
+}
+
 sub check_misc {
     print_header("MISCELLANEOUS CHECKS");
     my $ssh_config = eval { PVE::Tools::file_get_contents('/root/.ssh/config') };
@@ -2164,6 +2211,14 @@ sub check_misc {
         } else {
             log_pass("Resolved node IP '$local_ip' configured and active on single interface.");
         }
+    }
+
+    my $udev_rule_file = "/etc/udev/rules.d/70-persistent-net.rules";
+    if (-f $udev_rule_file) {
+        log_warn(
+            "Old udev rules file '$udev_rule_file' for NIC-pinning found - NICs are likely to be"
+                . " renamed with newer systemd version. Replace the file with a custom"
+                . " systemd.link file.");
     }
 
     log_info("Check node certificate's RSA key size");
@@ -2217,6 +2272,7 @@ sub check_misc {
     check_rrd_migration();
     check_legacy_ipam_files();
     check_legacy_sysctl_conf();
+    check_cpu_microcode_package();
 }
 
 my sub colored_if {
