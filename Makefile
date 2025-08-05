@@ -32,7 +32,7 @@ $(BUILDDIR):
 	rm -rf $@ $@.tmp
 	mkdir $@.tmp
 	rsync -a * $@.tmp
-	echo "git clone git://git.proxmox.com/git/pve-manager.git\\ngit checkout $(GITVERSION)" >  $@.tmp/debian/SOURCE
+	echo "git clone https://github.com/wy414012/pve-manager.git\\ngit checkout $(GITVERSION)" >  $@.tmp/debian/SOURCE
 	echo "REPOID_GENERATED=$(GITVERSION)" > $@.tmp/debian/rules.env
 	mv $@.tmp $@
 

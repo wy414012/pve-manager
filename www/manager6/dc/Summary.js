@@ -234,7 +234,15 @@ Ext.define('PVE.dc.Summary', {
         me.mon(rstore, 'load', dcHealth.updateStatus, dcHealth);
 
         let subs = me.down('#subscriptions');
-        me.mon(rstore, 'load', function (store, records, success) {
+        me.mon(rstore, 'load', function (_store, _records, _success) {
+            let data = {
+                title: PVE.Utils.render_support_level('active'), // 使用有效的订阅级别
+                iconCls: PVE.Utils.get_health_icon('good', true),
+                text: gettext('Your subscription status is valid.'),
+            };
+            subs.setUserCls('');
+            subs.setData(data);
+            /*注释掉检测订阅机制直接返回全绿状态    
             var level;
             var mixed = false;
             for (let i = 0; i < records.length; i++) {
@@ -287,7 +295,7 @@ Ext.define('PVE.dc.Summary', {
                 subs.setUserCls('');
             }
 
-            subs.setData(data);
+            subs.setData(data);*/
         });
 
         me.on('destroy', function () {
