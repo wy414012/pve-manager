@@ -1824,7 +1824,7 @@ sub check_lvm_autoactivation {
             ? "Some affected volumes are on shared LVM storages, which has known issues (Bugzilla"
             . " #4997). Disabling autoactivation for those is strongly recommended!"
             : "All volumes with autoactivations reside on local storage, where this normally does"
-            . " not causes any issues.";
+            . " not cause any issues.";
         $_log->(
             "Starting with PVE 9, autoactivation will be disabled for new LVM/LVM-thin guest"
                 . " volumes. This system has some volumes that still have autoactivation enabled. "
@@ -1834,7 +1834,7 @@ sub check_lvm_autoactivation {
                 . "\n");
     } else {
         log_pass(
-            "No volumes were found that could potentially have issues due to the disabling of LVM autoactivation."
+            "No problematic volumes found."
         );
     }
 
@@ -1957,7 +1957,8 @@ sub check_rrd_migration {
 
         my $total_size_estimate = 0;
         for my $dir (sort keys $rrd_usage_multipliers->%*) {
-            my $dir_size = PVE::Tools::du("/var/lib/rrdcached/db/${dir}");
+            my $dir_size = eval { PVE::Tools::du("/var/lib/rrdcached/db/${dir}") };
+            next if !defined($dir_size);
             $total_size_estimate += $dir_size * $rrd_usage_multipliers->{$dir};
         }
         my $estimate_gib = $total_size_estimate / 1024. / 1024 / 1024;
@@ -2164,6 +2165,7 @@ sub check_cpu_microcode_package {
         log_warn(
             "The matching CPU microcode package '$microcode_pkg' could not be found! Consider"
                 . " installing it to receive the latest security and bug fixes for your CPU.\n"
+                .  "\tEnsure you enable the 'non-free-firmware' component in the apt sources and run:\n"
                 . "\tapt install $microcode_pkg");
     }
 }
