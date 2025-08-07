@@ -1267,50 +1267,6 @@ sub check_containers_cgroup_compat {
     my $supports_cgroupv2 = sub {
         my ($conf, $rootdir, $ctid) = @_;
 
-        my $get_systemd_version = sub {
-            my ($self) = @_;
-
-            my @dirs = (
-                '/lib/systemd',
-                '/usr/lib/systemd',
-                '/usr/lib/x86_64-linux-gnu/systemd',
-                '/usr/lib64/systemd',
-            );
-            my $libsd;
-            for my $dir (@dirs) {
-                $libsd = PVE::Tools::dir_glob_regex($dir, "libsystemd-shared-.+\.so");
-                last if defined($libsd);
-            }
-            if (
-                defined($libsd) && $libsd =~ /libsystemd-shared-(\d+)(\.\d-\d)?(\.fc\d\d)?\.so/
-            ) {
-                return $1;
-            }
-
-            return undef;
-        };
-
-        my $unified_cgroupv2_support = sub {
-            my ($self) = @_;
-
-            # https://www.freedesktop.org/software/systemd/man/systemd.html
-            # systemd is installed as symlink to /sbin/init
-            my $systemd = CORE::readlink('/sbin/init');
-
-            # assume non-systemd init will run with unified cgroupv2
-            if (!defined($systemd) || $systemd !~ m@/systemd$@) {
-                return 1;
-            }
-
-            # systemd version 232 (e.g. debian stretch) supports the unified hierarchy
-            my $sdver = $get_systemd_version->();
-            if (!defined($sdver) || $sdver < 232) {
-                return 0;
-            }
-
-            return 1;
-        };
-
         my $ostype = $conf->{ostype};
         if (!defined($ostype)) {
             log_warn("Found CT ($ctid) without 'ostype' set!");
@@ -1319,7 +1275,7 @@ sub check_containers_cgroup_compat {
         }
 
         my $lxc_setup = PVE::LXC::Setup->new($conf, $rootdir);
-        return $lxc_setup->protected_call($unified_cgroupv2_support);
+        return $lxc_setup->unified_cgroupv2_support();
     };
 
     my $log_problem = sub {
@@ -1604,7 +1560,9 @@ sub check_bootloader {
 
     if (!-d '/sys/firmware/efi') {
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
-            log_info("systemd-boot package installed on legacy-boot system is not necessary, consider remoing it");
+            log_info(
+                "systemd-boot package installed on legacy-boot system is not necessary, consider remoing it"
+            );
             return;
         }
         log_skip("System booted in legacy-mode - no need for additional packages");
@@ -1618,8 +1576,8 @@ sub check_bootloader {
         }
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
             log_warn("systemd-boot meta-package installed this will cause issues on upgrades of"
-                ." boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly"
-                ." and remove 'systemd-boot'");
+                . " boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly"
+                . " and remove 'systemd-boot'");
             return;
         }
     } else {
@@ -1639,7 +1597,8 @@ sub check_bootloader {
         }
         if (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
             log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
-                . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64.");
+                . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64."
+            );
             return;
         } else {
             log_pass("bootloader packages installed correctly");
@@ -1831,9 +1790,7 @@ sub check_lvm_autoactivation {
                 . "\t/usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation"
                 . "\n");
     } else {
-        log_pass(
-            "No problematic volumes found."
-        );
+        log_pass("No problematic volumes found.");
     }
 
     return undef;
