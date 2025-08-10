@@ -1411,7 +1411,7 @@ sub check_apt_repos {
             next if $line !~ m/^deb[[:space:]]/; # is case sensitive
 
             my ($url, $suite, $component);
-            if ($line =~ m|deb\s+(\w+://\S+)\s+(?:(\S+)(?:\s+(\S+))?)?|i) {
+            if ($line =~ m|deb\s+(?:\[[^\]]*\]\s+)?(\w+://\S+)\s+(?:(\S+)(?:\s+(\S+))?)?|i) {
                 ($url, $suite, $component) = ($1, $2, $3);
             } else {
                 next;
@@ -1561,7 +1561,7 @@ sub check_bootloader {
     if (!-d '/sys/firmware/efi') {
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
             log_info(
-                "systemd-boot package installed on legacy-boot system is not necessary, consider remoing it"
+                "systemd-boot package installed on legacy-boot system is not necessary, consider removing it"
             );
             return;
         }
@@ -1569,38 +1569,57 @@ sub check_bootloader {
         return;
     }
 
+    my $boot_ok = 1;
     if (-f "/etc/kernel/proxmox-boot-uuids") {
         if (!$upgraded) {
             log_skip("not yet upgraded, systemd-boot still needed for bootctl");
             return;
         }
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
-            log_warn("systemd-boot meta-package installed this will cause issues on upgrades of"
+            log_fail("systemd-boot meta-package installed this will cause issues on upgrades of"
                 . " boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly"
                 . " and remove 'systemd-boot'");
             return;
         }
     } else {
         if (-f "/usr/share/doc/systemd-boot/changelog.Debian.gz") {
-            my $exit_code = eval {
-                run_command(['bootctl', 'is-installed', '--quiet', '--graceful'], noerr => 1);
-            };
-            if ($exit_code != 0) {
-                log_warn(
-                    "systemd-boot meta-package installed but the system does not seem to use it"
-                        . " for booting. This can cause problems on upgrades of other boot-related packages."
-                        . " Consider removing 'systemd-boot'");
-            } else {
-                log_info("systemd-boot used as bootloader and fitting meta-package installed.");
-                return;
-            }
+            log_fail(
+                "systemd-boot meta-package installed. This will cause problems on upgrades of other"
+                    . " boot-related packages. Remove 'systemd-boot' See"
+                    . " https://pve.proxmox.com/wiki/Upgrade_from_8_to_9#sd-boot-warning for more information."
+            );
+            $boot_ok = 0;
         }
         if (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
             log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
                 . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64."
             );
-            return;
-        } else {
+            $boot_ok = 0;
+        }
+        if (-f "/boot/efi/EFI/BOOT/BOOTX64.efi") {
+            my $update_removable_missing = 1;
+            my $exit_code = eval {
+                run_command(
+                    ['debconf-show', '--db', 'configdb', 'grub-efi-amd64', 'grub-pc'],
+                    outfunc => sub {
+                        my ($line) = @_;
+                        if ($line =~ m|grub2/force_efi_extra_removable: +true$|) {
+                            $update_removable_missing = 0;
+                        }
+                    },
+                    noerr => 1,
+                );
+            };
+            if ($update_removable_missing) {
+                log_warn(
+                    "Removable bootloader found at '/boot/efi/EFI/BOOT/BOOTX64.efi', but GRUB packages"
+                        . " not set up to update it!\nRun the following command:\n"
+                        . "echo 'grub-efi-amd64 grub2/force_efi_extra_removable boolean true' | debconf-set-selections -v -u\n"
+                        . "Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'");
+                $boot_ok = 0;
+            }
+        }
+        if ($boot_ok) {
             log_pass("bootloader packages installed correctly");
         }
     }
@@ -1794,6 +1813,32 @@ sub check_lvm_autoactivation {
     }
 
     return undef;
+}
+
+sub check_lvm_thin_check_options {
+    log_info("Checking lvm config for thin_check_options...");
+
+    my $section;
+    my $detected;
+    my $detect_thin_check_override = sub {
+        my $line = shift;
+        if ($line =~ m/^(\S+) \{/) {
+            $section = $1;
+            return;
+        }
+        if ($line =~ m/thin_check_options/ && $line !~ m/--clear-needs-check-flag/) {
+            $detected = 1;
+            log_fail(
+                "detected override for 'thin_check_options' in '$section' section without"
+                    . " '--clear-needs-check-flag' option - add the option to your override (most"
+                    . " likely in /etc/lvm/lvm.conf)");
+        }
+    };
+    eval {
+        run_command(['lvmconfig'], outfunc => $detect_thin_check_override);
+        log_pass("Check for correct thin_check_options passed") if !$detected;
+    };
+    log_fail("unable to run 'lvmconfig' command - $@") if $@;
 }
 
 sub check_glusterfs_storage_usage {
@@ -2029,11 +2074,11 @@ sub check_legacy_ipam_files {
 
     if (-e $LEGACY_IPAM_DB) {
         if (-e $NEW_IPAM_DB) {
-            log_notice("Found leftover legacy IPAM DB file in $LEGACY_IPAM_DB.\n"
+            log_notice("Found leftover legacy IPAM DB file in '$LEGACY_IPAM_DB'.\n"
                 . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+.");
         } else {
-            log_fail("Found IPAM DB file in $LEGACY_IPAM_DB that has not been migrated!\n"
-                . "\tFile needs to be migrated to $NEW_IPAM_DB before upgrading. Updating"
+            log_fail("Found IPAM DB file in '$LEGACY_IPAM_DB' that has not been migrated!\n"
+                . "\tFile needs to be migrated to '$NEW_IPAM_DB' before upgrading. Updating"
                 . " pve-network to the newest version should take care of that!\n"
                 . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
             );
@@ -2044,11 +2089,11 @@ sub check_legacy_ipam_files {
 
     if (-e $LEGACY_MAC_DB) {
         if (-e $NEW_MAC_DB) {
-            log_notice("Found leftover legacy MAC DB file in $LEGACY_MAC_DB.\n"
+            log_notice("Found leftover legacy MAC DB file in '$LEGACY_MAC_DB'.\n"
                 . "\tThis file can be deleted AFTER upgrading ALL nodes to PVE 8.4+");
         } else {
-            log_fail("Found MAC DB file in $LEGACY_MAC_DB that has not been migrated!\n"
-                . "\tFile needs to be migrated to $NEW_MAC_DB before upgrading. Updating"
+            log_fail("Found MAC DB file in '$LEGACY_MAC_DB' that has not been migrated!\n"
+                . "\tFile needs to be migrated to '$NEW_MAC_DB' before upgrading. Updating"
                 . " pve-network to the newest version should take care of that!\n"
                 . "\tIf you do not use SDN or IPAM (anymore), you can move or delete the file."
             );
@@ -2229,6 +2274,7 @@ sub check_misc {
     check_legacy_notification_sections();
     check_legacy_backup_job_options();
     check_lvm_autoactivation();
+    check_lvm_thin_check_options();
     check_rrd_migration();
     check_legacy_ipam_files();
     check_legacy_sysctl_conf();
