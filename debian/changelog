@@ -1,4 +1,16 @@
-pve-manager (8.4.10-1) bookworm; urgency=medium
+pve-manager (8.4.11-1) bookworm; urgency=medium
+
+  * 合并稳定版修复补丁
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 15 Aug 2025 10:49:14 +0800
+
+pve-manager (8.4.11) bookworm; urgency=medium
+
+  * ui: make sure more datacenter option renderers are html encoded
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 13 Aug 2025 13:06:12 +0200
+
+pve-manager (8.4.10) bookworm; urgency=medium
 
   * 合并稳定版修复补丁
 
