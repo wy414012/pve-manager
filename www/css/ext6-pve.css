@@ -92,13 +92,7 @@
 /* loading in task list */
 .x-grid-row-loading {
     background: no-repeat center center;
-    background-image: url(../ext6/theme-crisp/resources/images/loadmask/loading.gif);
-}
-
-/* console icon in task list */
-.x-grid-row-console {
-    background: no-repeat center center;
-    background-image: url(../images/icon-display.png);
+    background-image: url(../images/spinner.svg);
 }
 
 /* for font-awesome colors */
@@ -256,7 +250,7 @@
 .pve-itype-treelist-item-icon-cdrom {
     top: 50%;
     transform: translateY(-50%);
-    content: url(../images/icon-cd.png);
+    content: url(../images/icon-cd-drive.svg);
 }
 
 /* the lxc template */
@@ -296,27 +290,16 @@
 }
 
 .pve-itype-icon-virt-viewer,
-.pve-itype-icon-tigervnc,
 .pve-itype-icon-novnc,
 .pve-itype-icon-xtermjs,
-.pve-itype-icon-display,
-.pve-itype-icon-network,
-.pve-itype-icon-network-server,
-.pve-itype-icon-keyboard,
 .pve-itype-icon-cdrom,
-.pve-itype-icon-qemu,
 .pve-itype-icon-qemu-template,
 .pve-itype-icon-qemu-running,
-.pve-itype-icon-lxc,
 .pve-itype-icon-lxc-template,
-.pve-itype-icon-lxc-running,
-.pve-itype-icon-swap,
 .pve-itype-icon-node,
 .pve-itype-icon-node-running,
-.pve-itype-icon-storage,
 .pve-itype-icon-pool,
 .pve-itype-icon-itype,
-.pve-itype-icon-usb,
 .pve-itype-icon-serial,
 .pve-itype-icon-cloud,
 .pve-itype-icon-pci,
@@ -342,55 +325,8 @@
     font-size: 14px;
 }
 
-.pve-itype-icon-qemu,
-.x-tree-node-computer,
-.x-grid-tree-node-expanded .x-tree-node-computer {
-    background-image: url(../images/icon-display.png);
-}
-
-.pve-itype-icon-lxc,
-.x-tree-node-lxc,
-.x-grid-tree-node-expanded .x-tree-node-lxc {
-    background-image: url(../images/lxc-off.png);
-}
-
-.pve-itype-icon-swap,
-.x-tree-node-lxc-swap,
-.x-grid-tree-node-expanded .x-tree-lxc-swap {
-    background-image: url(../images/icon-swap.png);
-}
-
-.pve-itype-icon-lxc-running,
-.x-tree-node-lxc-running,
-.x-grid-tree-node-expanded .x-tree-node-lxc-running {
-    background-image: url(../images/lxc-on.png);
-}
-
-.pve-itype-icon-storage,
-.x-tree-node-harddisk,
-.x-grid-tree-node-expanded .x-tree-node-harddisk {
-    background-image: url(../images/icon-harddisk.png);
-}
-
-.x-tree-node-snapshot,
-.x-grid-tree-node-expanded .x-tree-node-snapshot {
-    background-image: url(../images/snapshot.png);
-}
-
 .pve-itype-icon-itype {
     background-image: url(../ext6/theme-classic/resources/images/tree/folder.gif);
-}
-
-.pve-itype-icon-network-server {
-    background-image: url(../images/network-server.png);
-}
-
-.pve-itype-icon-network {
-    background-image: url(../images/icon-network.png);
-}
-
-.pve-itype-icon-keyboard {
-    background-image: url(../images/icon-keyboard.png);
 }
 
 .pve-itype-icon-cdrom {
@@ -398,28 +334,19 @@
     background-image: url(../images/icon-cd-drive.svg);
 }
 
-.pve-itype-icon-display {
-    background-image: url(../images/icon-display.png);
-}
-
-.pve-itype-icon-tigervnc {
-    background-image: url(../images/tigervnc.png);
-}
-
 .pve-itype-icon-novnc {
-    background-image: url(../images/novnc.png);
+    background-size: 16px;
+    background-image: url(../images/novnc.svg);
 }
 
 .pve-itype-icon-virt-viewer {
-    background-image: url(../images/virt-viewer.png);
+    background-size: 16px;
+    background-image: url(../images/virt-viewer.svg);
 }
 
 .pve-itype-icon-xtermjs {
-    background-image: url(../images/xtermjs.png);
-}
-
-.pve-itype-icon-usb {
-    background-image: url(../images/icon-usb.png);
+    background-size: 16px;
+    background-image: url(../images/xtermjs.svg);
 }
 
 .pve-itype-icon-pci {
@@ -522,8 +449,8 @@ div.right-aligned {
     height: 14px;
     position: absolute;
     left: 1px;
-    top: 4px;
-    background-image: url(../images/logo-ceph.png);
+    top: 5px;
+    background-image: url(../images/logo-ceph.svg);
     background-size: 14px 14px;
     content: " ";
 }
