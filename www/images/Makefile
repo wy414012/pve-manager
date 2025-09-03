@@ -2,7 +2,7 @@ include ../../defines.mk
 
 all:
 
-# virt-viewer.svg copied from virt-viewer source:
+# virt-viewer.svg copied from virt-viewer source (and reformatted):
 # https://github.com/webrulon/virt-viewer/blob/master/icons/virt-viewer.svg
 #
 # novnc.svg copied from the noVnc source:
@@ -17,7 +17,7 @@ all:
 # https://commons.wikimedia.org/wiki/File:DE9_Diagram.svg
 # (public domain)
 
-# logo-ceph is adapted from Ceph_Logo.svg
+# logo-ceph is adapted and reformatted from Ceph_Logo.svg:
 # https://github.com/ceph/ceph/blob/main/src/pybind/mgr/dashboard/frontend/src/assets/Ceph_Logo.svg
 
 # xtermjs.svg was copied from the xtermjs-branding sources:
