@@ -54,6 +54,9 @@ Ext.define('PVE.node.StatusView', {
             title: gettext('RAM usage'),
             valueField: 'memory',
             maxField: 'memory',
+            warningThreshold: 0.9,
+            criticalThreshold: 0.975,
+            // TODO: split out ARC usage
             renderer: Proxmox.Utils.render_node_size_usage,
         },
         {
@@ -61,9 +64,7 @@ Ext.define('PVE.node.StatusView', {
             printBar: false,
             title: gettext('KSM sharing'),
             textField: 'ksm',
-            renderer: function (record) {
-                return Proxmox.Utils.render_size(record.shared);
-            },
+            renderer: (record) => Proxmox.Utils.render_size(record.shared),
             padding: '0 10 10 10',
         },
         {

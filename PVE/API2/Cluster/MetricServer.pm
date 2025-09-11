@@ -3,16 +3,16 @@ package PVE::API2::Cluster::MetricServer;
 use warnings;
 use strict;
 
-use PVE::Tools qw(extract_param extract_sensitive_params);
-use PVE::Exception qw(raise_perm_exc raise_param_exc);
-use PVE::JSONSchema qw(get_standard_option);
+use PVE::APIClient::LWP;
+use PVE::AccessControl;
+use PVE::Cluster;
 use PVE::INotify;
 use PVE::RPCEnvironment;
+use PVE::SafeSyslog;
+use PVE::Tools qw(extract_param extract_sensitive_params);
+
 use PVE::ExtMetric;
 use PVE::PullMetric;
-use PVE::SafeSyslog;
-
-use PVE::RESTHandler;
 
 use base qw(PVE::RESTHandler);
 
@@ -325,6 +325,11 @@ __PACKAGE__->register_method({
                 optional => 1,
                 default => 0,
             },
+            'node-list' => {
+                type => 'string',
+                description => 'Only return metrics from nodes passed as comma-separated list',
+                optional => 1,
+            },
             'start-time' => {
                 type => 'integer',
                 description => 'Only include metrics with a timestamp > start-time.',
@@ -404,20 +409,35 @@ __PACKAGE__->register_method({
             $generations = 0;
         }
 
-        my @metrics = @{ PVE::PullMetric::get_local_metrics($generations) };
-
-        if (defined($start)) {
-            @metrics = grep {
-                $_->{timestamp} > ($start)
-            } @metrics;
-        }
+        my @node_list =
+            $param->{'node-list'} ? PVE::Tools::split_list($param->{'node-list'}) : ();
 
         my $nodename = PVE::INotify::nodename();
+        my $include_local_metrics =
+            !$param->{'node-list'} || grep { $nodename eq $_ } @node_list;
+
+        my @metrics;
+        if ($include_local_metrics) {
+            @metrics = @{ PVE::PullMetric::get_local_metrics($generations) };
+
+            if (defined($start)) {
+                @metrics = grep {
+                    $_->{timestamp} > ($start)
+                } @metrics;
+            }
+        }
 
         # Fan out to cluster members
         # Do NOT remove this check
-        if (!$local_only) {
+        if (!$local_only || @node_list) {
             my $members = PVE::Cluster::get_members();
+
+            @node_list = keys $members->%* if !@node_list;
+
+            if (my @unknown_nodes = grep { !exists($members->{$_}) } @node_list) {
+                die "Requested node-list contains unknown nodes - "
+                    . join(', ', @unknown_nodes) . "\n";
+            }
 
             my $rpcenv = PVE::RPCEnvironment::get();
             my $authuser = $rpcenv->get_user();
@@ -435,7 +455,7 @@ __PACKAGE__->register_method({
                 $ticket = PVE::AccessControl::assemble_ticket($authuser);
             }
 
-            for my $name (keys %$members) {
+            for my $name (@node_list) {
                 if ($name eq $nodename) {
                     # Skip own node, for that one we already have the metrics
                     next;
@@ -454,7 +474,7 @@ __PACKAGE__->register_method({
                         host => $ip,
                         port => 8006,
                         ticket => $ticket,
-                        timeout => 5,
+                        timeout => 20,
                     };
 
                     $conn_args->{cached_fingerprints} = { $fingerprint => 1 };
