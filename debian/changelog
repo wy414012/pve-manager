@@ -1,8 +1,17 @@
-pve-manager (8.4.13-1) bookworm; urgency=medium
+pve-manager (8.4.14-1) bookworm; urgency=medium
 
-  * 合并稳定版修复补丁
+  * 合并稳定版补丁变更版本号为：8.4.14-1
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 06 Sep 2025 10:36:54 +0800
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Thu, 18 Sep 2025 15:35:58 +0800
+
+pve-manager (8.4.14) bookworm; urgency=medium
+
+  * ui: datacenter notes: fix visibility of top toolbar to allow editing the
+    notes again.
+
+  * update shipped appliance info index.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 17 Sep 2025 16:22:59 +0200
 
 pve-manager (8.4.13) bookworm; urgency=medium
 
