@@ -1128,16 +1128,28 @@ my %shell_cmd_params = (
 );
 
 sub get_shell_command {
-    my ($user, $shellcmd, $args) = @_;
+    my ($user, $shellcmd, $args, $tunnel_cmd) = @_;
+
+    my $is_ssh_tunneling = defined($tunnel_cmd) && scalar(@$tunnel_cmd);
 
     my $cmd;
     if ($user eq 'root@pam') {
         if (defined($shellcmd) && exists($shell_cmd_map->{$shellcmd})) {
             my $def = $shell_cmd_map->{$shellcmd};
-            $cmd = [@{ $def->{cmd} }]; # clone
+
+            if ($is_ssh_tunneling && $cmd eq 'login') {
+                # stop-gap to avoid running into a racy bug with nested login, i.e. first from SSH
+                # second would be this command here, likely related to vhangup.
+                $cmd = [];
+            } else {
+                $cmd = [ $def->{cmd}->@* ]; # clone
+            }
+
             if (defined($args) && $def->{allow_args}) {
                 push @$cmd, split("\0", $args);
             }
+        } elsif ($is_ssh_tunneling) {
+            $cmd = []; # SSH logs us already in as root, and we must not nest login (vhangup).
         } else {
             $cmd = ['/bin/login', '-f', 'root'];
         }
@@ -1145,7 +1157,8 @@ sub get_shell_command {
         # non-root must always login for now, we do not have a superuser role!
         $cmd = ['/bin/login'];
     }
-    return $cmd;
+
+    return $is_ssh_tunneling ? [ $tunnel_cmd->@*, $cmd->@* ] : $cmd;
 }
 
 my $get_vnc_connection_info = sub {
@@ -1230,9 +1243,9 @@ __PACKAGE__->register_method({
         $sslcert = PVE::Tools::file_get_contents("/etc/pve/pve-root-ca.pem", 8192)
             if !$sslcert;
 
-        my ($port, $remcmd) = $get_vnc_connection_info->($node);
+        my ($port, $tunnel_cmd) = $get_vnc_connection_info->($node);
 
-        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'});
+        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'}, $tunnel_cmd);
 
         my $timeout = 10;
 
@@ -1256,7 +1269,7 @@ __PACKAGE__->register_method({
             push @$cmd, '-notls', '-listen', 'localhost';
         }
 
-        push @$cmd, '-c', @$remcmd, @$shcmd;
+        push @$cmd, '-c', @$shcmd;
 
         my $realcmd = sub {
             my $upid = shift;
@@ -1338,9 +1351,9 @@ __PACKAGE__->register_method({
         my $authpath = "/nodes/$node";
         my $ticket = PVE::AccessControl::assemble_vnc_ticket($user, $authpath);
 
-        my ($port, $remcmd) = $get_vnc_connection_info->($node);
+        my ($port, $tunnel_cmd) = $get_vnc_connection_info->($node);
 
-        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'});
+        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'}, $tunnel_cmd);
 
         my $realcmd = sub {
             my $upid = shift;
@@ -1350,7 +1363,7 @@ __PACKAGE__->register_method({
             my $cmd = [
                 '/usr/bin/termproxy', $port, '--path', $authpath, '--perm', 'Sys.Console', '--',
             ];
-            push @$cmd, @$remcmd, @$shcmd;
+            push @$cmd, @$shcmd;
 
             PVE::Tools::run_command($cmd);
         };
