@@ -97,3 +97,7 @@ h)启动服务
 ```bash
 systemctl start cpufreq-ondemand.service
 ```
+i)查看服务状态
+```bash
+systemctl status cpufreq-ondemand.service
+```
