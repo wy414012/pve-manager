@@ -11,45 +11,45 @@
 ## 依赖安装
 
 1、温度功耗等信息显示依赖的工具
-```shell
+```bash
 apt install lm-sensors
 ```
 2、配置传感器：
-```shell
+```bash
 sensors-detect  全部yes加回车
 ````
-```shell
+```bash
 sensors -j  验证配置后的输出
 ```
 3、功耗：
 
 a) 第一步，安装cpupower工具
 
-```shell
+```bash
 apt install linux-cpupower
 ```
 b) 安装完成后，修改一下turbostat的执行权限
 
-```shell
+```bash
 chmod +s /usr/sbin/turbostat
 ```
 
 c) 解决重启后不生效
 
-```shell
+```bash
 echo msr > /etc/modules-load.d/turbostat.conf
 ```
 4、电源模式配置
 
 a)查看本机支持模式
 
-```shell
+```bash
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
 ```
 
 b)查看当前性能模式
 
-```shell
+```bash
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 ```
 
@@ -65,21 +65,20 @@ c)设置电源模式可选，使用我们查看到支持的模式
 | schedutil | 负载变化回调机制，后面新引入的机制，通过触发 schedutil sugov_update 进行调频动。 |
 
 d)推荐配置模式命令：
-```shell
+```bash
 echo "ondemand" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 ```
 e)编写一个服务来实现开机自动切换：
-```shell
+```bash
 nano /etc/systemd/system/cpufreq-ondemand.service
 ```
-```shell
+```bash
 [Unit]  
 Description=Set CPU scaling governor to ondemand  
-After=sysinit.target  
+After=network.target  
   
 [Service]  
-ExecStart=/bin/bash -c 'echo "ondemand" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'  
-ExecStart=/bin/bash -c 'for cpu in /sys/devices/system/cpu/cpu*; do [[ -d $cpu/cpufreq ]] && echo ondemand > $cpu/cpufreq/scaling_governor; done'  
+ExecStart=/bin/bash -c 'echo "ondemand" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'   
 Type=oneshot  
 RemainAfterExit=yes  
   
@@ -87,14 +86,14 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 ```
 f)重载服务
-```shell
+```bash
 systemctl daemon-reload
 ```
 g)配置开机启动
-```shell
+```bash
 systemctl enable cpufreq-ondemand.service
 ```
 h)启动服务
-```shell
+```bash
 systemctl start cpufreq-ondemand.service
 ```
