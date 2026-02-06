@@ -1,8 +1,31 @@
-pve-manager (8.4.14-1) bookworm; urgency=medium
+pve-manager (8.4.16-1) bookworm; urgency=medium
 
-  * 合并稳定版补丁变更版本号为：8.4.14-1
+  * api: apt changelog: make package name and option handling more robust.
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Thu, 18 Sep 2025 15:35:58 +0800
+  * pveupdate: do not try to update subscription when using offline key.
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 06 Feb 2026 15:50:25 +0800
+
+pve-manager (8.4.16) bookworm; urgency=medium
+
+  * api: apt changelog: make package name and option handling more robust.
+
+  * pveupdate: do not try to update subscription when using offline key.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 22 Dec 2025 18:14:08 +0100
+
+pve-manager (8.4.15) bookworm; urgency=medium
+
+  * update shipped aplliance info index.
+
+  * ui: backport various fixes for the resource tree rendering, especially
+    w.r.t. tags.
+
+  * pve8to9: improve error/log message for tls checks.
+
+  * pve-sdn-commit: run for vlan/qinq zones on non-vlan-aware bridges.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 10 Dec 2025 20:45:36 +0100
 
 pve-manager (8.4.14) bookworm; urgency=medium
 
