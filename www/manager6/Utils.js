@@ -402,7 +402,7 @@ Ext.define('PVE.Utils', {
             enabled: gettext('Enabled'),
             disabled: gettext('Disabled'),
             'not a volume': gettext('Not a volume'),
-            'efidisk but no OMVF BIOS': gettext('EFI Disk without OMVF BIOS'),
+            'efidisk but no OVMF BIOS': gettext('EFI Disk without OVMF BIOS'),
         },
 
         renderNotFound: (what) => Ext.String.format(gettext('No {0} found'), what),
@@ -1014,9 +1014,6 @@ Ext.define('PVE.Utils', {
 
             if (value.managed) {
                 text = value.state || Proxmox.Utils.noneText;
-
-                text += ', ' + Proxmox.Utils.groupText + ': ';
-                text += value.group || Proxmox.Utils.noneText;
             }
 
             return text;
@@ -1276,6 +1273,13 @@ Ext.define('PVE.Utils', {
                 // templates
                 objType = 'template';
                 status = type;
+            } else if (type === 'network') {
+                const networkTypeMapping = {
+                    fabric: 'fa fa-road',
+                    zone: 'fa fa-th',
+                };
+
+                return networkTypeMapping[record['network-type']] ?? '';
             } else if (type === 'storage' && record.content === 'import') {
                 return 'fa fa-cloud-download';
             } else {
@@ -1299,6 +1303,11 @@ Ext.define('PVE.Utils', {
             var cls = PVE.Utils.get_object_icon_class(value, record.data);
 
             var fa = '<i class="fa-fw x-grid-icon-custom ' + cls + '"></i> ';
+
+            if (value === 'network') {
+                return fa + record.data['network-type'];
+            }
+
             return fa + value;
         },
 
@@ -1551,6 +1560,15 @@ Ext.define('PVE.Utils', {
                 }
             } else if (type === 'qemu' || type === 'lxc' || type === 'node') {
                 menu = Ext.create('PVE.' + type + '.CmdMenu', {
+                    pveSelNode: record,
+                    nodename: record.data.node,
+                });
+            } else if (type === 'tag') {
+                menu = Ext.create('PVE.dc.TagCmdMenu', {
+                    tag: record.data.tag,
+                });
+            } else if (record?.isRoot()) {
+                menu = Ext.create('PVE.dc.CmdMenu', {
                     pveSelNode: record,
                     nodename: record.data.node,
                 });
@@ -2066,6 +2084,10 @@ Ext.define('PVE.Utils', {
             acmeupdate: ['ACME Account', gettext('Update')],
             'auth-realm-sync': [gettext('Realm'), gettext('Sync')],
             'auth-realm-sync-test': [gettext('Realm'), gettext('Sync Preview')],
+            'bulk-migrate': ['', gettext('Bulk migrate VMs and Containers')],
+            'bulk-start': ['', gettext('Bulk start VMs and Containers')],
+            'bulk-shutdown': ['', gettext('Bulk shutdown VMs and Containers')],
+            'bulk-suspend': ['', gettext('Bulk shutdown VMs and Containers')],
             cephcreatemds: ['Ceph Metadata Server', gettext('Create')],
             cephcreatemgr: ['Ceph Manager', gettext('Create')],
             cephcreatemon: ['Ceph Monitor', gettext('Create')],

@@ -39,7 +39,15 @@ $rpcenv->set_user('root@pam');
 
 my $nodename = PVE::INotify::nodename();
 
-eval { PVE::API2::Subscription->update({ node => $nodename }); };
+eval {
+    my $subscription_info = PVE::API2::Subscription::read_etc_subscription();
+    return if !$subscription_info; # return from eval, the API endpoint would early-return too.
+
+    # return from eval, no point in updating offline subscription keys
+    return if $subscription_info->{signature};
+
+    PVE::API2::Subscription->update({ node => $nodename });
+};
 if (my $err = $@) {
     syslog('err', "update subscription info failed: $err");
 }
@@ -111,7 +119,10 @@ eval {
 
         # check if cert is really signed by the ca
         # TODO: replace by low level ssleay interface if version 1.86 is available
-        PVE::Tools::run_command(['/usr/bin/openssl', 'verify', '-CAfile', $capath, $certpath]);
+        my $cmd = [
+            '/usr/bin/openssl', 'verify', '-no_check_time', '-CAfile', $capath, '--', $certpath,
+        ];
+        PVE::Tools::run_command($cmd);
 
         print "PVE certificate $msg\n";
         # create new certificate
@@ -122,7 +133,10 @@ eval {
         PVE::Tools::run_command(['systemctl', 'reload-or-restart', 'pveproxy']);
     };
 
-    if (PVE::Certificate::check_expiry($certpath, time() + 14 * 24 * 60 * 60)) {
+    if (PVE::Certificate::check_expiry($certpath)) {
+        # already expired
+        $renew->("expired, renewing...");
+    } elsif (PVE::Certificate::check_expiry($certpath, time() + 14 * 24 * 60 * 60)) {
         # expires in next 2 weeks
         $renew->("expires soon, renewing...");
     } elsif (!PVE::Certificate::check_expiry($certpath, time() + 2 * 365 * 24 * 60 * 60)) {

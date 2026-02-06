@@ -96,6 +96,13 @@ Ext.define('PVE.qemu.CreateWizard', {
                     fieldLabel: gettext('Name'),
                     allowBlank: true,
                 },
+                {
+                    xtype: 'proxmoxcheckbox',
+                    name: 'ha-managed',
+                    // only submit value of checkbox if checked
+                    uncheckedValue: undefined,
+                    fieldLabel: gettext('Add to HA'),
+                },
             ],
             column2: [
                 {

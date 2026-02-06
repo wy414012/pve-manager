@@ -176,6 +176,168 @@ Ext.define('PVE.storage.TemplateDownload', {
     },
 });
 
+Ext.define('PVE.storage.OciRegistryPull', {
+    extend: 'Proxmox.window.Edit',
+    alias: 'widget.pveOciRegistryPull',
+    mixins: ['Proxmox.Mixin.CBind'],
+
+    method: 'POST',
+
+    showTaskViewer: true,
+
+    title: gettext('Pull from OCI Registry'),
+    submitText: gettext('Download'),
+    width: 450,
+
+    cbind: {
+        url: '/nodes/{nodename}/storage/{storage}/oci-registry-pull',
+    },
+
+    controller: {
+        xclass: 'Ext.app.ViewController',
+
+        onReferenceChange: function (field, value) {
+            let me = this;
+            let view = me.getView();
+            let tagField = view.down('[name=tag]');
+            tagField.setComboItems([]);
+            let matches = me.parseReference(value);
+            if (matches) {
+                let ref = matches[0];
+                let tag = matches[1];
+
+                if (tag) {
+                    field.setValue(ref);
+                    tagField.setValue(tag);
+                    tagField.focus();
+                } else {
+                    tagField.clearValue();
+                }
+            }
+        },
+
+        parseReference: function (value) {
+            const re = new RegExp(
+                '^((?:[a-zA-Z\\d](?:[a-zA-Z\\d-]*[a-zA-Z\\d])?(?:\\.(?:[a-zA-Z\\d]' +
+                    '(?:[a-zA-Z\\d-]*[a-zA-Z\\d])?))*(?::\\d+)?/)?[a-z\\d]+(?:(?:[._]|__|-+)' +
+                    '[a-z\\d]+)*(?:/[a-z\\d]+(?:(?:[._]|__|-+)[a-z\\d]+)*)*)' +
+                    '(?::(\\w[\\w.-]{0,127}))?$',
+            );
+            let matches = value.match(re);
+            if (matches) {
+                let ref = matches[1];
+                let tag = matches[2];
+                return [ref, tag];
+            }
+            return undefined;
+        },
+
+        queryTags: function (field) {
+            let me = this;
+            let view = me.getView();
+            let refField = view.down('[name=reference]');
+            let reference = refField.value.trim();
+            let tagField = view.down('[name=tag]');
+
+            Proxmox.Utils.API2Request({
+                url: `/nodes/${view.nodename}/query-oci-repo-tags`,
+                method: 'GET',
+                params: {
+                    reference,
+                },
+                waitMsgTarget: view,
+                failure: (res) => {
+                    Ext.MessageBox.alert(gettext('Error'), res.htmlStatus);
+                },
+                success: function (res, opt) {
+                    let tags = res.result.data;
+                    tagField.clearValue();
+                    tagField.setComboItems(tags.map((tag) => [tag, Ext.htmlEncode(tag)]));
+                },
+            });
+        },
+    },
+
+    items: [
+        {
+            xtype: 'inputpanel',
+            border: false,
+            onGetValues: function (values) {
+                values.reference = values.reference + ':' + values.tag;
+                delete values.tag;
+                if (!values.filename) {
+                    delete values.filename;
+                }
+                return values;
+            },
+            items: [
+                {
+                    xtype: 'fieldcontainer',
+                    layout: 'hbox',
+                    fieldLabel: gettext('Reference'),
+                    items: [
+                        {
+                            xtype: 'textfield',
+                            name: 'reference',
+                            allowBlank: false,
+                            emptyText: 'registry.example.org/name',
+                            flex: 1,
+                            listeners: {
+                                change: 'onReferenceChange',
+                            },
+                            validator: function (value) {
+                                let me = this;
+                                let controller = me.up('pveOciRegistryPull').getController();
+                                if (controller.parseReference(value)) {
+                                    return true;
+                                }
+                                return gettext('Invalid OCI Registry Reference');
+                            },
+                        },
+                        {
+                            xtype: 'button',
+                            name: 'check',
+                            text: gettext('Query Tags'),
+                            margin: '0 0 0 5',
+                            listeners: {
+                                click: 'queryTags',
+                            },
+                        },
+                    ],
+                },
+                {
+                    xtype: 'proxmoxKVComboBox',
+                    name: 'tag',
+                    allowBlank: false,
+                    // TRANSLATORS: As in a version of an OCI container, e.g. debian:latest
+                    emptyText: gettext("for example 'latest'"),
+                    fieldLabel: gettext('Tag'),
+                    forceSelection: false,
+                    editable: true,
+                    typeAhead: true,
+                    comboItems: [],
+                },
+                {
+                    xtype: 'textfield',
+                    name: 'filename',
+                    emptyText: '<reference>_<tag>',
+                    fieldLabel: gettext('File name'),
+                },
+            ],
+        },
+    ],
+
+    initComponent: function () {
+        var me = this;
+
+        if (!me.nodename) {
+            throw 'no node name specified';
+        }
+
+        me.callParent();
+    },
+});
+
 Ext.define('PVE.storage.TemplateView', {
     extend: 'PVE.storage.ContentView',
 
@@ -213,7 +375,20 @@ Ext.define('PVE.storage.TemplateView', {
             },
         });
 
-        me.tbar = [templateButton];
+        var pullOciImageButton = Ext.create('Proxmox.button.Button', {
+            itemId: 'pull-oci-img-btn',
+            text: gettext('Pull from OCI Registry'),
+            handler: function () {
+                var win = Ext.create('PVE.storage.OciRegistryPull', {
+                    nodename: nodename,
+                    storage: storage,
+                    taskDone: () => reload(),
+                });
+                win.show();
+            },
+        });
+
+        me.tbar = [templateButton, pullOciImageButton];
         me.useUploadButton = true;
 
         me.callParent();

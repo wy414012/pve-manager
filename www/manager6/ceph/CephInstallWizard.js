@@ -48,7 +48,14 @@ Ext.define('PVE.ceph.CephVersionSelector', {
                 type: 'json',
             },
         },
-        data: [{ release: 'squid', version: '19.2' }],
+        data: [
+            { release: 'squid', version: '19.2' },
+            {
+                release: 'tentacle',
+                version: '20.2',
+                preview: true /* TODO: drop after stabilisation */,
+            },
+        ],
     },
 });
 
@@ -177,6 +184,10 @@ Ext.define('PVE.ceph.CephInstallWizard', {
                         : gettext(
                               'The no-subscription repository is not the best choice for production setups.',
                           );
+                } else if (repo === 'manual') {
+                    return gettext(
+                        'The manual repository option expects that the repository is already configured. For example, in combination with the Proxmox Offline Mirror.',
+                    );
                 } else {
                     return gettext(
                         'The test repository should only be used for test setups or after consulting the official Proxmox support!',
@@ -347,6 +358,7 @@ Ext.define('PVE.ceph.CephInstallWizard', {
                                 ['enterprise', gettext('Enterprise (recommended)')],
                                 ['no-subscription', gettext('No-Subscription')],
                                 ['test', gettext('Test')],
+                                ['manual', gettext('Manual')],
                             ],
                             labelWidth: 150,
                             submitValue: false,

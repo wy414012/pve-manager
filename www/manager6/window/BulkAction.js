@@ -13,12 +13,27 @@ Ext.define('PVE.window.BulkAction', {
     // the action to set, currently there are: `startall`, `migrateall`, `stopall`, `suspendall`
     action: undefined,
 
+    // if set to true, the 'vms' parameter will be sent as an array'
+    // necessary for the cluster-wide api call
+    vmsAsArray: false,
+
     submit: function (params) {
         let me = this;
 
+        let url;
+        if (me.nodename) {
+            url = `/nodes/${me.nodename}/${me.action}`;
+        } else {
+            url = `/cluster/bulk-action/guest/${me.action}`;
+        }
+
+        if (me.vmsAsArray) {
+            params.vms = params.vms.split(/[,; ]/);
+        }
+
         Proxmox.Utils.API2Request({
             params: params,
-            url: `/nodes/${me.nodename}/${me.action}`,
+            url,
             waitMsgTarget: me,
             method: 'POST',
             failure: (response) => Ext.Msg.alert('Error', response.htmlStatus),
@@ -38,9 +53,6 @@ Ext.define('PVE.window.BulkAction', {
     initComponent: function () {
         let me = this;
 
-        if (!me.nodename) {
-            throw 'no node name specified';
-        }
         if (!me.action) {
             throw 'no action specified';
         }
@@ -52,7 +64,11 @@ Ext.define('PVE.window.BulkAction', {
         }
 
         let items = [];
-        if (me.action === 'migrateall') {
+        if (me.action === 'migrateall' || me.action === 'migrate') {
+            let disallowedNodes = [];
+            if (me.nodename) {
+                disallowedNodes.push(me.nodename);
+            }
             items.push(
                 {
                     xtype: 'fieldcontainer',
@@ -62,7 +78,7 @@ Ext.define('PVE.window.BulkAction', {
                             flex: 1,
                             xtype: 'pveNodeSelector',
                             name: 'target',
-                            disallowedNodes: [me.nodename],
+                            disallowedNodes,
                             fieldLabel: gettext('Target node'),
                             labelWidth: 200,
                             allowBlank: false,
@@ -71,9 +87,10 @@ Ext.define('PVE.window.BulkAction', {
                         },
                         {
                             xtype: 'proxmoxintegerfield',
+                            // TODO: change to newer max-worker spelling for PVE 10
                             name: 'maxworkers',
                             minValue: 1,
-                            maxValue: 100,
+                            maxValue: 64,
                             value: 1,
                             fieldLabel: gettext('Parallel jobs'),
                             allowBlank: false,
@@ -106,13 +123,20 @@ Ext.define('PVE.window.BulkAction', {
                     ],
                 },
             );
+            if (me.action === 'migrate') {
+                items.push({
+                    xtype: 'hiddenfield',
+                    name: 'online',
+                    value: 1,
+                });
+            }
         } else if (me.action === 'startall') {
             items.push({
                 xtype: 'hiddenfield',
                 name: 'force',
                 value: 1,
             });
-        } else if (me.action === 'stopall') {
+        } else if (me.action === 'stopall' || me.action === 'shutdown') {
             items.push({
                 xtype: 'fieldcontainer',
                 layout: 'hbox',
@@ -125,7 +149,7 @@ Ext.define('PVE.window.BulkAction', {
                         boxLabel: gettext('Force stop guest if shutdown times out.'),
                         checked: true,
                         uncheckedValue: 0,
-                        flex: 1,
+                        flex: 7,
                     },
                     {
                         xtype: 'proxmoxintegerfield',
@@ -136,7 +160,30 @@ Ext.define('PVE.window.BulkAction', {
                         minValue: 0,
                         maxValue: 7200,
                         allowBlank: true,
-                        flex: 1,
+                        flex: 3,
+                    },
+                ],
+            });
+        }
+        if (me.action !== 'migrateall' && me.action !== 'migrate') {
+            items.push({
+                xtype: 'fieldcontainer',
+                layout: 'hbox',
+                items: [
+                    {
+                        xtype: 'box',
+                        flex: 7,
+                    },
+                    {
+                        xtype: 'proxmoxintegerfield',
+                        name: 'max-workers',
+                        minValue: 1,
+                        maxValue: 64,
+                        emptyText: 'auto',
+                        fieldLabel: gettext('Parallel jobs'),
+                        labelWidth: 120,
+                        allowBlank: true,
+                        flex: 3,
                     },
                 ],
             });
@@ -152,8 +199,17 @@ Ext.define('PVE.window.BulkAction', {
             me.down('#lxcwarning').setVisible(showWarning);
         };
 
-        let defaultStatus =
-            me.action === 'migrateall' ? '' : me.action === 'startall' ? 'stopped' : 'running';
+        let defaulStatusMap = {
+            migrateall: '',
+            migrate: '',
+            startall: 'stopped',
+            start: 'stopped',
+            stopall: 'running',
+            shutdown: 'running',
+            suspendall: 'running',
+            suspend: 'running',
+        };
+        let defaultStatus = defaulStatusMap[me.action] ?? '';
         let defaultType = me.action === 'suspendall' ? 'qemu' : '';
 
         let statusMap = [];
@@ -187,18 +243,11 @@ Ext.define('PVE.window.BulkAction', {
 
         let clearFilters = function () {
             me.down('#namefilter').setValue('');
-            [
-                'name',
-                'status',
-                'pool',
-                'type',
-                'hastate',
-                'includetag',
-                'excludetag',
-                'vmid',
-            ].forEach((filter) => {
-                me.down(`#${filter}filter`).setValue('');
-            });
+            ['name', 'status', 'pool', 'type', 'hastate', 'includetag', 'excludetag'].forEach(
+                (filter) => {
+                    me.down(`#${filter}filter`).setValue('');
+                },
+            );
         };
 
         let filterChange = function () {
@@ -504,6 +553,10 @@ Ext.define('PVE.window.BulkAction', {
         });
 
         me.callParent();
+
+        if (me.prefilterIncludeTag) {
+            me.down('#includetagfilter').setValue(me.prefilterIncludeTag);
+        }
 
         form.on('validitychange', function () {
             let valid = form.isValid();

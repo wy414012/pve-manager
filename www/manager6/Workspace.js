@@ -13,6 +13,8 @@ Ext.define('PVE.Workspace', {
 
     loginData: null, // Data from last login call
 
+    response401count: 0,
+
     onLogin: function (loginData) {
         // override me
     },
@@ -23,8 +25,6 @@ Ext.define('PVE.Workspace', {
         me.loginData = loginData;
         Proxmox.Utils.setAuthData(loginData);
 
-        let rt = me.down('pveResourceTree');
-        rt.setDatacenterText(loginData.clustername);
         PVE.ClusterName = loginData.clustername;
 
         if (loginData.cap) {
@@ -55,6 +55,11 @@ Ext.define('PVE.Workspace', {
         }
         me.onLogin(null);
         me.login.show();
+
+        // reset ui state
+        PVE.ClusterName = undefined;
+        me.down('pveResourceTree')?.clearTree();
+        me.setContent(null);
     },
 
     initComponent: function () {
@@ -250,6 +255,7 @@ Ext.define('PVE.StdWorkspace', {
                             lxc: 'pveLXCConfig',
                             storage: 'PVE.storage.Browser',
                             sdn: 'PVE.sdn.Browser',
+                            network: 'PVE.network.Browser',
                             pool: 'pvePoolConfig',
                             tag: 'pveTagConfig',
                         };
@@ -343,23 +349,31 @@ Ext.define('PVE.StdWorkspace', {
                     margin: '2 0 2 5',
                     items: [
                         {
-                            xtype: 'proxmoxlogo',
+                            xtype: 'proxmoxLogoSvg',
+                            prefix: 'pwt',
                         },
                         {
                             minWidth: 150,
                             id: 'versioninfo',
                             html: 'Virtual Environment',
+                            padding: '0 5',
                             style: {
-                                'font-size': '14px',
-                                'line-height': '18px',
+                                'font-size': '16px',
+                                'line-height': '20px',
                             },
+                        },
+                        {
+                            flex: 2,
                         },
                         {
                             xtype: 'pveGlobalSearchField',
                             tree: rtree,
+                            minWidth: 150,
+                            maxWidth: 600,
+                            flex: 3,
                         },
                         {
-                            flex: 1,
+                            flex: 2,
                         },
                         {
                             xtype: 'proxmoxHelpButton',
@@ -441,10 +455,6 @@ Ext.define('PVE.StdWorkspace', {
                                     handler: function () {
                                         PVE.data.ResourceStore.loadData([], false);
                                         me.showLogin();
-                                        me.setContent(null);
-                                        var rt = me.down('pveResourceTree');
-                                        rt.setDatacenterText(undefined);
-                                        rt.clearTree();
 
                                         // empty the stores of the StatusPanel child items
                                         var statusPanels =
@@ -498,7 +508,10 @@ Ext.define('PVE.StdWorkspace', {
                                     handler: () => {
                                         Ext.create('PVE.window.TreeSettingsEdit', {
                                             autoShow: true,
-                                            apiCallDone: () => PVE.UIOptions.fireUIConfigChanged(),
+                                            apiCallDone: () => {
+                                                rtree.refreshTree();
+                                                PVE.UIOptions.fireUIConfigChanged();
+                                            },
                                         });
                                     },
                                 },

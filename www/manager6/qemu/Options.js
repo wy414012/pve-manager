@@ -352,7 +352,7 @@ Ext.define('PVE.qemu.Options', {
                     ? {
                           xtype: 'proxmoxWindowEdit',
                           subject: gettext('VM State storage'),
-                          onlineHelp: 'chapter_virtual_machines', // FIXME: use 'qm_vmstatestorage' once available
+                          onlineHelp: 'qm_vmstatestorage',
                           width: 350,
                           items: {
                               xtype: 'pveStorageSelector',
@@ -382,6 +382,18 @@ Ext.define('PVE.qemu.Options', {
                     }
                     if (amd_sev.type === 'snp') {
                         return 'AMD SEV-SNP (' + value + ')';
+                    }
+                    return value;
+                },
+            },
+            'intel-tdx': {
+                header: gettext('Intel TDX'),
+                editor: caps.vms['VM.Config.HWType'] ? 'PVE.qemu.TdxEdit' : undefined,
+                defaultValue: Proxmox.Utils.defaultText + ' (' + Proxmox.Utils.disabledText + ')',
+                renderer: function (value, metaData, record, ri, ci, store, pending) {
+                    let intel_tdx = PVE.Parser.parsePropertyString(value, 'type');
+                    if (intel_tdx.type === 'tdx') {
+                        return 'Intel (' + value + ')';
                     }
                     return value;
                 },

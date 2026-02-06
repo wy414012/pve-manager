@@ -1,8 +1,372 @@
-pve-manager (9.0.10-1) trixie; urgency=medium
+pve-manager (9.1.5-1) trixie; urgency=medium
 
-  * 合并最新提交变更版本号：9.0.10-1
+  * 合并实验性功能，并保留默认使用中科大镜像源
 
- -- Proxmox Support Team <ymwlpoolc@qq.com>  Thu, 18 Sep 2025 15:33:39 +0800
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 06 Feb 2026 16:06:40 +0800
+
+pve-manager (9.1.5) trixie; urgency=medium
+
+  * ui: display: update 'live-migration with VNC-clipboard not working' note.
+
+  * pveceph setup: warn if experimental release is selected with (default)
+    enterprise repo.
+
+  * pveceph setup: prompt switch from enterprise to test repo for experimental
+    release.
+
+  * ceph: add Ceph 20.2 Tentacle as available (preview) release.
+
+  * fix #7149: ui: user create: do not leak changing the realm for a new user
+    into the pre-selected realm of the currently logged in user, as that might
+    cause some UX friction and confusion on their next login.
+
+  * ui: fully reset UI state on automatic logout due to stale ticket (e.g.,
+    after resuming a computer from longer suspend), as just showing the login
+    mask on top of the current state might be a bit confusing.
+
+  * ui: utils: fix OVMF typo in error message translation.
+
+  * update shipped appliance info index to current CDN state.
+
+  * fix #7229: bulk actions: refresh pmxcfs infos between processing each
+    guest to ensure any changes in-between, like from a hook script, are
+    visible for successive starts.
+
+  * http server: unify error message in case of authentication failure due to
+    wrong credentials.
+
+  * ui: resource tree: don't show empty grouping nodes as expandable.
+
+  * ui: resource tree: show nested pools as actual child nodes of their parent
+    pool and in turn drop rendering their parent path prefix.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 27 Jan 2026 19:59:53 +0100
+
+pve-manager (9.1.4) trixie; urgency=medium
+
+  * api: apt changelog: check for odd package name and ensure arguments are
+    separated from options.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 22 Dec 2025 12:02:58 +0100
+
+pve-manager (9.1.3) trixie; urgency=medium
+
+  * ui: ceph install wizard: fix typo.
+
+  * close #6209: ui: allow creating snapshots and backups from the context menu.
+
+  * ui: improve some translatable strings and add some context for translators.
+
+  * ui: bulk actions: don't try to reset non-existing 'vmidfilter', which would
+    cause an error in the browser console.
+
+  * d/postinst: drop now obsolete apt-auth.conf migration. It was required after
+    upgrading from Proxmox VE 7 to 8. A direct upgrade from Proxmox VE 7 to 9 is
+    not possible, so it's obsolete.
+
+  * fix #7125: ui: fix loading network section in folder view. Navigating to the
+    'Network' section would fail with a browser error, because of a missing
+    reference to the documentation.
+
+  * pve-sdn-commit: run for vlan/qinq zones on non-vlan-aware bridges. When
+    using non-vlan-aware bridges for the VLAN or QinQ zones, it is necessary to
+    regenerate the SDN configuration when the name of the physical NIC might
+    have changed. In particular, this fixes issues in combination with pinning
+    NIC names.
+
+  * api: workaround broken 'maxworkers' alias in bulk actions api calls. For the
+    new, cluster-wide bulk actions, only the 'max-workers' spelling would have
+    an effect. For the pre-existing node-specific bulk migration, an error would
+    occur when specifying the deprecated 'maxworkers' spelling, causing an error
+    when using the UI.
+
+  * ui: storage oci pull: optimize regular expression for the reference to avoid
+    catastrophic backtracking potentially causing hangs in the dialog window.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 12 Dec 2025 10:32:10 +0100
+
+pve-manager (9.1.2) trixie; urgency=medium
+
+  * pve8to9: improve message for TLS checks in relation to different key bit
+    size for RSA or ECC based keys.
+
+  * fix #2077: pvenode: drop dependency on GNU readline Perl module in favor
+    of our own PTY module. While it's less flexible, it's much simpler and
+    robust, and–more importantly–it has no issues with being instantiated more
+    than once, which recently became an error in the readline module, breaking
+    EAB ACME integration.
+
+  * api: bulk actions: use kebab-case for 'max-workers' parameter with alias
+    to old 'maxworkers' spelling for backwards compatibility.
+
+  * api: cluster bulk actions: fall-back to datacenter.cfg for max-workers.
+
+  * api: cluster bulk actions: increase default worker from 1 to 4 for start,
+    stop & suspend actions.
+
+  * api: cluster bulk actions: define minimum of 1 and a maximum of 64 for
+    max-workers parameter.
+
+  * api: node bulk action: add max-worker parameter to stop and suspend
+    actions to allow overriding through API.
+
+  * api: node bulk action: improve the cpu-thread-count derived max-worker
+    fallback, which is used when neither an API parameter nor an max_worker
+    setting in the datacenter config is set. Ensure that there is always one
+    core left over for the system and use maximum of 8 workers.
+
+  * api: node bulk start: implement concurrent workers and add max-worker
+    API parameter.
+
+  * api: node bulk migrate: set maximum of max-worker parameter to 64.
+
+  * ui: bulk action window: give box-label hint for force-stop checkbox more
+    space.
+
+  * ui: bulk action window: add max-workers field to all actions.
+
+  * ui: bulk action window: adapt to lowered upper-limit for migrate
+    max-worker.
+
+  * pveupdate: do not try to update subscription when using offline key.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 29 Nov 2025 20:18:26 +0100
+
+pve-manager (9.1.1) trixie; urgency=medium
+
+  * ui: storage: oci registry pull: make parsing the reference of a OCI image
+    URL more robust and add a validator to the reference field for better
+    immediate feedback to the user.
+
+  * ui: storage oci pull: reword empty text for tag field to avoid suggesting
+    that this placeholder is the default value, as we currently do not have
+    any here.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 18 Nov 2025 19:08:54 +0100
+
+pve-manager (9.1.0) trixie; urgency=medium
+
+  * bump for Proxmox VE 9.1.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 18 Nov 2025 00:32:05 +0100
+
+pve-manager (9.0.18) trixie; urgency=medium
+
+  * ui: resource tree: fix rendering of guest text when sorted by name.
+
+  * ui: fix recent regression from wrongly rendering guest entries in the tag
+    view.
+
+  * ui: console: add a simple heuristic to detect application containers and
+    show a warning for them in the console view, as the console for such
+    containers is (currently) likely not fully functional.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 18 Nov 2025 15:21:34 +0100
+
+pve-manager (9.0.17) trixie; urgency=medium
+
+  * ui: lxc: options: make sure values of recently added properties are
+    html-encoded.
+
+  * ui: lxc options: fix rendering default value tty count in edit window.
+
+  * fix: ui: trim leading and trailing white space from OCI registry reference
+    for convenience.
+
+  * ui: qemu: stop marking SEV-ES and SEV-SNP options as experimental.
+
+  * ui: sdn: improve naming of vm network device column in bridge view.
+
+  * ui: qemu tdx: add support for configuring TDX attestation.
+
+  * ui: resource tree: fix timing race where rendered clustername in root-node
+    could seemingly vanish.
+
+  * ui: lxc: support configuring empty environment variables.
+
+  * network-interface-pinning: fix creating directory when '/usr/local/lib'
+    does not exist.
+
+  * ui: create wizard: only submit ha-managed if checked for better
+    compatibility with other nodes that are still running a slightly older
+    package version set.
+
+  * ui: storage: oci registry pull: add filename field to allow overriding the
+    default one.
+
+  * ui: add worker task type description mappings for cluster-wide bulk
+    actions.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 17 Nov 2025 22:22:23 +0100
+
+pve-manager (9.0.16) trixie; urgency=medium
+
+  * api: add endpoint to query OCI registries for the tags (versions) of an
+    image.
+
+  * ui: template view: add OCI registry pull dialog.
+
+  * ui: lxc: add support to edit container runtime environment.
+    The new environment management provides a convenient way to change the
+    containers runtime environment. Some container (OCI) images support basic
+    configuration through the environment.
+
+  * ui: lxc network: support advanced host-managed option for containers where
+    the network is setup on start directly by the host, avoiding the need for
+    any network management stack inside the CT.
+
+  * ui: lxc options: add support for init command entrypoint. Custom container
+    images or OCI images might want to adapt the initial command that gets
+    executed as entry point on container start. For system containers this is
+    `/sbin/init`, which quite often points to systemd. Most OCI application
+    images use a different command, and some even support passing
+    (configuration) arguments through this command line.
+
+  * ui: provide a context menu for the datacenter node in the main resource
+    tree providing central access to the new cluster-wide bulk-actions for
+    guests.
+
+  * ui: provide a context menu for the tag nodes in the main resource tree if
+    the "Tag View" is selected. This allows one to conveniently execute bulk
+    actions for all guests that have a specific tag.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sun, 16 Nov 2025 22:48:04 +0100
+
+pve-manager (9.0.15) trixie; urgency=medium
+
+  * ui: ip view: ensure container is fully initialized before store update.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 15 Nov 2025 18:05:29 +0100
+
+pve-manager (9.0.14) trixie; urgency=medium
+
+  * fix creating worker task log file for new cluster-wide bulk migrations.
+
+  * ui: container: show dynamically assigned IPs in network tab.
+
+  * ui: reuse IP overview from VMs for container and show it in the CT
+    summary view.
+
+  * ui: summary view: increase row height to ensure there's enough space by
+    default for new IP overview. This results in the RRD metrics charts to
+    have 250px height for the actual data.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 15 Nov 2025 17:22:14 +0100
+
+pve-manager (9.0.13) trixie; urgency=medium
+
+  * ui: qemu options: add support to configure Intel TDX for confidential
+    computing (similar to AMD SEV).
+
+  * ui: ha: do not show legacy HA group info in guest status view, as groups
+    got replaced with the more flexible HA Affinity-Rules in Proxmox VE 9.
+
+  * ui: qemu: tpm drive: non-raw image formats are now supported for TPM state
+    drives.
+
+  * rrd metrics: always prefer new-format keys over old-format keys to avoid
+    artificially delaying showing the current status of a VM/CT on a fresh
+    cluster.
+
+  * api: termproxy, vncwebsocket: allow one to using API tokens, the user
+    still needs a local PAM login to use the shell.
+
+  * 8to9: drop warnings specific to now outdated RRD migration tool.
+
+  * api: implement node-independent cluster wide guest bulk actions like
+    start, stop, migrate or suspend.
+
+  * ui: add guest bulk actions menu at the right side of the datacenter level
+    top bar.
+
+  * api: metric export: reuse credentials from request for proxying.
+
+  * ui: ha resource removal: allow one to purge resource from all rules.
+
+  * VM and CT create wizard: add checkbox for creating HA resource upon VM
+    creation.
+
+  * ui: restore: add checkbox for adding HA resource upon restore of a guest
+    backup.
+
+  * ui: ha: rules: make status icon unclickable if there are no errors.
+
+  * ui: replace Proxmox logo with slightly larger SVG version for better and
+    crisper scaling on HiDPI displays.
+
+  * ui: workspace: move global search bar in the middle and make it flexible
+    to better use available space in the top bar.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 14 Nov 2025 21:58:08 +0100
+
+pve-manager (9.0.12) trixie; urgency=medium
+
+  * fix #6815: ui: resource tree: update tag colors properly.
+
+  * fix #6779: daily update: renew already expired certificates, e.g. for when
+    nodes are offline for a longer period of time.
+
+  * fix #6897: ui: add online help reference for LXC container feature edit
+    window.
+
+  * ui: properly reset API 401 count to avoid rare edge case where there is no
+    login mask shown after having been logged out (e.g. expired ticket).
+
+  * api: apt: add 'all' variant to architecture property.
+
+  * api: apt: correctly encode fields from available updates as utf8.
+
+  * fix #6443: ui: improve online help for VM State storage.
+
+  * ui: ha: remove default focus from VM/CT dropdown in resource edit window
+    to avoid opening the picker immediately when opening the window.
+
+  * ha: do not allow an empty VM/CT dropdown in resource edit window.
+
+  * fix #6932: api: acme: add digest and plugin to return schema.
+
+  * ui: VM cpu flag selector: query CPU flag list via API.
+
+  * status: rrd metrics: always use pve-node-9.0 data format path and drop RRD
+    metrics format migration on upgrade as we now transparently read from the
+    old file if a time-frame falls under the old file(s).
+
+  * api: nodes: use new status module for sdn subdirectory.
+
+  * pvestatd: add network resource to status reporting.
+
+  * api: cluster: add support for network resource type.
+
+  * ui: resource tree: add network resource.
+
+  * ui: network browser:
+    - add ip-vrf panel for evpn zones.
+    - add mac vrf panel.
+    - add zone bridge view.
+
+  * ui: sdn: status view: adapt to new network resource.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 14 Nov 2025 02:05:47 +0100
+
+pve-manager (9.0.11) trixie; urgency=medium
+
+  * close #4248: ui: Add Reset button to right click context menu of virtual
+    machines, like available in the resource tree or the global search result.
+
+  * ui: guest snapshot: remove excess '}' at the end of window title
+
+  * fix #5244 pveceph: install: add new 'manual' repository option, which, for
+    example, can be useful for offline installation
+
+  * ui: ceph install wizard: add option and hint for 'manual' repository for,
+    e.g., offline installation through a Proxmox Offline Mirror managed
+    repository.
+
+  * fix typo in ifupdown2 version error message.
+
+  * update shipped appliance info index.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 06 Oct 2025 19:03:25 +0200
 
 pve-manager (9.0.10) trixie; urgency=medium
 
@@ -40,7 +404,12 @@ pve-manager (9.0.8) trixie; urgency=medium
 
 pve-manager (9.0.7-1) trixie; urgency=medium
 
+<<<<<<< HEAD
   * bump:9.0.7-1
+=======
+  * ui: VM cpu: recognize kebab-cased properties like while parsing to avoid
+    losing the value of such a manually set option on edit.
+>>>>>>> 80cf92a64bef688903b7cec75e834e88f4a4b932
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Wed, 03 Sep 2025 15:21:47 +0800
 
@@ -709,7 +1078,7 @@ pve-manager (8.2.5-1) bookworm; urgency=medium
 
 pve-manager (9.0.0~2) trixie; urgency=medium
 
-  * d/control: run all binary tragets under (fake)root to ensure dpkg-deb
+  * d/control: run all binary targets under (fake)root to ensure dpkg-deb
     knows about different file ownerships when assembling the archive, like
     the one from /var/log/pveproxy.
 
@@ -874,7 +1243,7 @@ pve-manager (8.3.5) bookworm; urgency=medium
 
   * ui: sdn ipam: powerDNS, NetBox, phpIPAM: add fingerprint textfield
 
-  * ui: storage pbs: re-use new pmxFingerprintField from widget-toolkit
+  * ui: storage pbs: reuse new pmxFingerprintField from widget-toolkit
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 06 Mar 2025 10:50:15 +0100
 
@@ -1388,7 +1757,7 @@ pve-manager (8.1.7) bookworm; urgency=medium
 pve-manager (8.1.6) bookworm; urgency=medium
 
   * ui: add guest import wizard in the content browser for storages that
-     upport the new 'import' content type.
+     support the new 'import' content type.
 
   * ui: support to add the new ESXi storage type, which provides only the
     'import' content type and can be used for importing VMs from a ESXi host
@@ -1527,12 +1896,12 @@ pve-manager (8.0.9) bookworm; urgency=medium
 
 pve-manager (8.0.8) bookworm; urgency=medium
 
-  * update shipped apliance info index
+  * update shipped appliance info index
 
   * report: add files from  interfaces.d and SDN config directories
 
   * node console: allow usage for non-pam realms, users still need to login
-    with credential recoginzed by PAM
+    with credential recognized by PAM
 
   * ui: wizards: allow adding tags in the qemu/lxc create wizard
 
@@ -2756,7 +3125,7 @@ pve-manager (7.0-15) bullseye; urgency=medium
     as markdown
 
   * fix #3505: ui: upload to storage: add checksum and algorithm to
-    auto-verify intergrity of files after they have been uploaded, similar to
+    auto-verify integrity of files after they have been uploaded, similar to
     the URL downloader.
 
   * ui: node: LVMThin: add volume group to columns
@@ -2781,7 +3150,7 @@ pve-manager (7.0-15) bullseye; urgency=medium
 
   * ui: storage: avoid deleting preallocation setting on creation
 
-  * ui: more re-use of user and TFA related widgets from widget-toolkit
+  * ui: more reuse of user and TFA related widgets from widget-toolkit
 
   * fix #2841: implement multiple second factors for users
 
@@ -2801,7 +3170,7 @@ pve-manager (7.0-15) bullseye; urgency=medium
 
   * ui: index: set Proxmox.NodeName variable
 
-  * ui: tfa: include cluster or node name in issuer for better recogintion in,
+  * ui: tfa: include cluster or node name in issuer for better recognition in,
     for example, TOTP apps
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 11 Nov 2021 21:37:07 +0100
@@ -3107,7 +3476,7 @@ pve-manager (6.4-7) pve; urgency=medium
 
   * pvereport: log pressure stall information
 
-  * pvereport: re-organize: add systemd-load section abd unify bios/pci in HW
+  * pvereport: re-organize: add systemd-load section and unify bios/pci in HW
     a single section
 
   * fix #3430: handle hook script paths better
@@ -3803,7 +4172,7 @@ pve-manager (6.1-2) pve; urgency=medium
 
   * LXC: Disable resize button when volume is unused
 
-  * ui: dc/options: fix capabillities for u2f, bwlimits, ha settings
+  * ui: dc/options: fix capabilities for u2f, bwlimits, ha settings
 
   * api: apt/versions: track ifupdown and ifupdown2 as optional package
 
@@ -4520,7 +4889,7 @@ pve-manager (5.2-11) unstable; urgency=medium
   * dc/user: render user fullnames htmlEncoded
 
   * ceph: osd: wipe start of blockdevice when destroying ceph disk to ensure it
-    can be re-used for any purpose
+    can be reused for any purpose
 
   * gui: expose lxc features
 
@@ -4564,7 +4933,7 @@ pve-manager (5.2-9) unstable; urgency=medium
 
 pve-manager (5.2-8) unstable; urgency=medium
 
-  * fix doubleclick on VM with spice console
+  * fix double-click on VM with spice console
 
   * ui: storage: combine RBD external and hyperconverged add dialog
 
@@ -4751,13 +5120,13 @@ pve-manager (5.1-50) unstable; urgency=medium
 
   * add advanced checkbox to the wizard
 
-  * Add CIFS in strorage info to allow backup.
+  * Add CIFS in storage info to allow backup.
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 06 Apr 2018 13:55:38 +0200
 
 pve-manager (5.1-49) unstable; urgency=medium
 
-  * add cluster administartion panel
+  * add cluster administration panel
 
   * ui: add storage plugin base class
 

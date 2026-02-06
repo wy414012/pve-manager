@@ -8,6 +8,7 @@ use Digest::SHA;
 use Filesys::Df;
 use HTTP::Status qw(:constants);
 use JSON;
+use List::Util qw(max min);
 use POSIX qw(LONG_MAX);
 use Time::Local qw(timegm_nocheck);
 use Socket;
@@ -49,6 +50,7 @@ use PVE::API2::Hardware;
 use PVE::API2::LXC::Status;
 use PVE::API2::LXC;
 use PVE::API2::Network;
+use PVE::API2::Network::SDN::Nodes::Status;
 use PVE::API2::NodeConfig;
 use PVE::API2::Qemu::CPU;
 use PVE::API2::Qemu;
@@ -59,12 +61,6 @@ use PVE::API2::Storage::Status;
 use PVE::API2::Subscription;
 use PVE::API2::Tasks;
 use PVE::API2::VZDump;
-
-my $have_sdn;
-eval {
-    require PVE::API2::Network::SDN::Zones::Status;
-    $have_sdn = 1;
-};
 
 use base qw(PVE::RESTHandler);
 
@@ -201,42 +197,10 @@ __PACKAGE__->register_method({
     path => 'config',
 });
 
-if ($have_sdn) {
-    __PACKAGE__->register_method({
-        subclass => "PVE::API2::Network::SDN::Zones::Status",
-        path => 'sdn/zones',
-    });
-
-    __PACKAGE__->register_method({
-        name => 'sdnindex',
-        path => 'sdn',
-        method => 'GET',
-        permissions => { user => 'all' },
-        description => "SDN index.",
-        parameters => {
-            additionalProperties => 0,
-            properties => {
-                node => get_standard_option('pve-node'),
-            },
-        },
-        returns => {
-            type => 'array',
-            items => {
-                type => "object",
-                properties => {},
-            },
-            links => [{ rel => 'child', href => "{name}" }],
-        },
-        code => sub {
-            my ($param) = @_;
-
-            my $result = [
-                { name => 'zones' },
-            ];
-            return $result;
-        },
-    });
-}
+__PACKAGE__->register_method({
+    subclass => "PVE::API2::Network::SDN::Nodes::Status",
+    path => 'sdn',
+});
 
 __PACKAGE__->register_method({
     name => 'index',
@@ -279,12 +243,14 @@ __PACKAGE__->register_method({
             { name => 'netstat' },
             { name => 'network' },
             { name => 'qemu' },
+            { name => 'query-oci-repo-tags' },
             { name => 'query-url-metadata' },
             { name => 'replication' },
             { name => 'report' },
             { name => 'rrd' }, # fixme: remove?
             { name => 'rrddata' },
             { name => 'scan' },
+            { name => 'sdn' },
             { name => 'services' },
             { name => 'spiceshell' },
             { name => 'startall' },
@@ -302,8 +268,6 @@ __PACKAGE__->register_method({
             { name => 'vzdump' },
             { name => 'wakeonlan' },
         ];
-
-        push @$result, { name => 'sdn' } if $have_sdn;
 
         return $result;
     },
@@ -872,10 +836,9 @@ __PACKAGE__->register_method({
     code => sub {
         my ($param) = @_;
 
-        my $path = "pve-node-9.0/$param->{node}";
-        $path = "pve2-node/$param->{node}" if !-e "/var/lib/rrdcached/db/${path}";
-        return PVE::RRD::create_rrd_graph($path, $param->{timeframe},
-            $param->{ds}, $param->{cf});
+        return PVE::RRD::create_rrd_graph(
+            "pve-node-9.0/$param->{node}", $param->{timeframe}, $param->{ds}, $param->{cf},
+        );
 
     },
 });
@@ -916,9 +879,9 @@ __PACKAGE__->register_method({
     code => sub {
         my ($param) = @_;
 
-        my $path = "pve-node-9.0/$param->{node}";
-        $path = "pve2-node/$param->{node}" if !-e "/var/lib/rrdcached/db/${path}";
-        return PVE::RRD::create_rrd_data($path, $param->{timeframe}, $param->{cf});
+        return PVE::RRD::create_rrd_data(
+            "pve-node-9.0/$param->{node}", $param->{timeframe}, $param->{cf},
+        );
     },
 });
 
@@ -1142,7 +1105,7 @@ sub get_shell_command {
                 # second would be this command here, likely related to vhangup.
                 $cmd = [];
             } else {
-                $cmd = [ $def->{cmd}->@* ]; # clone
+                $cmd = [$def->{cmd}->@*]; # clone
             }
 
             if (defined($args) && $def->{allow_args}) {
@@ -1158,7 +1121,7 @@ sub get_shell_command {
         $cmd = ['/bin/login'];
     }
 
-    return $is_ssh_tunneling ? [ $tunnel_cmd->@*, $cmd->@* ] : $cmd;
+    return $is_ssh_tunneling ? [$tunnel_cmd->@*, $cmd->@*] : $cmd;
 }
 
 my $get_vnc_connection_info = sub {
@@ -1335,17 +1298,23 @@ __PACKAGE__->register_method({
     returns => {
         additionalProperties => 0,
         properties => {
-            user => { type => 'string' },
-            ticket => { type => 'string' },
-            port => { type => 'integer' },
-            upid => { type => 'string' },
+            user => {
+                type => 'string',
+                description => 'user/token that generated the VNC ticket in `ticket`.',
+            },
+            ticket => {
+                type => 'string',
+                description => 'VNC ticket used to verify websocket connection.',
+            },
+            port => { type => 'integer', description => 'port used to bind termproxy to.' },
+            upid => { type => 'string', description => 'UPID for termproxy worker task.' },
         },
     },
     code => sub {
         my ($param) = @_;
 
         my $rpcenv = PVE::RPCEnvironment::get();
-        my ($user, undef, $realm) = PVE::AccessControl::verify_username($rpcenv->get_user());
+        my $user = $rpcenv->get_user();
 
         my $node = $param->{node};
         my $authpath = "/nodes/$node";
@@ -1361,7 +1330,14 @@ __PACKAGE__->register_method({
             syslog('info', "starting termproxy $upid\n");
 
             my $cmd = [
-                '/usr/bin/termproxy', $port, '--path', $authpath, '--perm', 'Sys.Console', '--',
+                '/usr/bin/termproxy',
+                $port,
+                '--path',
+                $authpath,
+                '--perm',
+                'Sys.Console',
+                '--vncticket-endpoint',
+                '--',
             ];
             push @$cmd, @$shcmd;
 
@@ -1417,7 +1393,7 @@ __PACKAGE__->register_method({
 
         my $rpcenv = PVE::RPCEnvironment::get();
 
-        my ($user, undef, $realm) = PVE::AccessControl::verify_username($rpcenv->get_user());
+        my $user = $rpcenv->get_user();
 
         my $authpath = "/nodes/$param->{node}";
 
@@ -1769,6 +1745,52 @@ __PACKAGE__->register_method({
 });
 
 __PACKAGE__->register_method({
+    name => 'query_oci_repo_tags',
+    path => 'query-oci-repo-tags',
+    method => 'GET',
+    description => "List all tags for an OCI repository reference.",
+    proxyto => 'node',
+    permissions => {
+        check => ['perm', '/nodes/{node}', ['Sys.AccessNetwork']],
+    },
+    parameters => {
+        additionalProperties => 0,
+        properties => {
+            node => get_standard_option('pve-node'),
+            reference => {
+                description => "The reference to the repository to query tags from.",
+                type => 'string',
+                pattern => '^(?:(?:[a-zA-Z\d]|[a-zA-Z\d][a-zA-Z\d-]*[a-zA-Z\d])'
+                    . '(?:\.(?:[a-zA-Z\d]|[a-zA-Z\d][a-zA-Z\d-]*[a-zA-Z\d]))*(?::\d+)?/)?[a-z\d]+'
+                    . '(?:(?:[._]|__|[-]*)[a-z\d]+)*(?:/[a-z\d]+(?:(?:[._]|__|[-]*)[a-z\d]+)*)*$',
+            },
+        },
+    },
+    returns => {
+        type => 'array',
+        items => {
+            type => 'string',
+        },
+    },
+    code => sub {
+        my ($param) = @_;
+
+        die "Install 'skopeo' to list tags from OCI registries.\n" if (!-f '/usr/bin/skopeo');
+
+        my $reference = $param->{reference};
+        my $tags_json = "";
+        PVE::Tools::run_command(
+            ["skopeo", "list-tags", "docker://$reference"],
+            outfunc => sub {
+                $tags_json = $tags_json . shift;
+            },
+        );
+        my $tags = decode_json($tags_json);
+        return $tags->{Tags};
+    },
+});
+
+__PACKAGE__->register_method({
     name => 'query_url_metadata',
     path => 'query-url-metadata',
     method => 'GET',
@@ -1899,8 +1921,8 @@ __PACKAGE__->register_method({
 # * current parent node
 # * vmid whitelist
 # * guest is a template (default: skip)
-# * guest is HA manged (default: skip)
-my $get_filtered_vmlist = sub {
+# * guest is HA managed (default: skip)
+sub get_filtered_vmlist {
     my ($nodename, $vmfilter, $templates, $ha_managed) = @_;
 
     my $vmlist = PVE::Cluster::get_vmlist();
@@ -1927,28 +1949,29 @@ my $get_filtered_vmlist = sub {
                 die "unknown virtual guest type '$d->{type}'\n";
             }
 
-            my $conf = $class->load_config($vmid);
+            my $conf = $class->load_config($vmid, $d->{node});
             return if !$templates && $class->is_template($conf);
             return if !$ha_managed && PVE::HA::Config::vm_is_ha_managed($vmid);
 
             $res->{$vmid}->{conf} = $conf;
             $res->{$vmid}->{type} = $d->{type};
             $res->{$vmid}->{class} = $class;
+            $res->{$vmid}->{node} = $d->{node};
         };
         warn $@ if $@;
     }
 
     return $res;
-};
+}
 
 # return all VMs which should get started/stopped on power up/down
-my $get_start_stop_list = sub {
+sub get_start_stop_list {
     my ($nodename, $autostart, $vmfilter) = @_;
 
     # do not skip HA vms on force or if a specific VMID set is wanted
     my $include_ha_managed = defined($vmfilter) ? 1 : 0;
 
-    my $vmlist = $get_filtered_vmlist->($nodename, $vmfilter, undef, $include_ha_managed);
+    my $vmlist = get_filtered_vmlist($nodename, $vmfilter, undef, $include_ha_managed);
 
     my $resList = {};
     foreach my $vmid (keys %$vmlist) {
@@ -1961,15 +1984,16 @@ my $get_start_stop_list = sub {
 
         $resList->{$order}->{$vmid} = $startup;
         $resList->{$order}->{$vmid}->{type} = $vmlist->{$vmid}->{type};
+        $resList->{$order}->{$vmid}->{node} = $vmlist->{$vmid}->{node};
     }
 
     return $resList;
-};
+}
 
 my $remove_locks_on_startup = sub {
     my ($nodename) = @_;
 
-    my $vmlist = &$get_filtered_vmlist($nodename, undef, undef, 1);
+    my $vmlist = get_filtered_vmlist($nodename, undef, undef, 1);
 
     foreach my $vmid (keys %$vmlist) {
         my $conf = $vmlist->{$vmid}->{conf};
@@ -1986,6 +2010,19 @@ my $remove_locks_on_startup = sub {
         warn $@ if $@;
     }
 };
+
+my sub get_max_workers {
+    my ($param) = @_;
+
+    return $param->{'max-workers'} if $param->{'max-workers'};
+
+    my $datacenter_config = PVE::Cluster::cfs_read_file('datacenter.cfg');
+    return $datacenter_config->{max_workers} if $datacenter_config->{max_workers};
+
+    my $cpuinfo = PVE::ProcFSTools::read_cpuinfo();
+
+    return min(max(1, $cpuinfo->{cpus} - 1), 8);
+}
 
 __PACKAGE__->register_method({
     name => 'startall',
@@ -2016,6 +2053,15 @@ __PACKAGE__->register_method({
                 type => 'string',
                 format => 'pve-vmid-list',
                 optional => 1,
+            },
+            'max-workers' => {
+                description => "Defines the maximum number of tasks running concurrently. If"
+                    . " not set, uses 'max_workers' from datacenter.cfg, and if that's not set, the"
+                    . " available CPU threads, clamped to a maximum of 8, are used.",
+                optional => 1,
+                type => 'integer',
+                minimum => 1,
+                maximum => 64,
             },
         },
     },
@@ -2061,7 +2107,23 @@ __PACKAGE__->register_method({
             warn $@ if $@;
 
             my $autostart = $force ? undef : 1;
-            my $startList = $get_start_stop_list->($nodename, $autostart, $param->{vms});
+            my $startList = get_start_stop_list($nodename, $autostart, $param->{vms});
+
+            my $max_workers = get_max_workers($param);
+            my $workers = {};
+            my $finish_worker = sub {
+                my $pid = shift;
+                my $worker = delete $workers->{$pid} || return;
+
+                my ($w_upid, $w_vmid, $w_type) = $worker->@{ 'upid', 'vmid', 'type' };
+
+                my $status = PVE::Tools::upid_read_status($w_upid);
+                if (PVE::Tools::upid_status_is_error($status)) {
+                    my $rendered_type = $w_type eq 'lxc' ? 'CT' : 'VM';
+                    print STDERR "Starting $rendered_type $w_vmid failed: $status\n";
+                }
+
+            };
 
             # Note: use numeric sorting with <=>
             for my $order (sort { $a <=> $b } keys %$startList) {
@@ -2071,6 +2133,7 @@ __PACKAGE__->register_method({
                     my $d = $vmlist->{$vmid};
 
                     PVE::Cluster::check_cfs_quorum(); # abort when we loose quorum
+                    PVE::Cluster::cfs_update(); # ensure modifications by hookscripts are visible
 
                     eval {
                         my $default_delay = 0;
@@ -2092,27 +2155,36 @@ __PACKAGE__->register_method({
                         }
 
                         my $task = PVE::Tools::upid_decode($upid);
-                        while (PVE::ProcFSTools::check_process_running($task->{pid})) {
-                            sleep(1);
+                        $workers->{ $task->{pid} } =
+                            { upid => $upid, vmid => $vmid, type => $d->{type} };
+
+                        # use default delay to reduce load
+                        my $delay = defined($d->{up}) ? int($d->{up}) : $default_delay;
+                        if ($delay > 0) {
+                            print STDERR "Waiting for $delay seconds (startup delay)\n"
+                                if $d->{up};
+                            for (my $i = 0; $i < $delay; $i++) {
+                                sleep(1);
+                            }
                         }
 
-                        my $status = PVE::Tools::upid_read_status($upid);
-                        if (!PVE::Tools::upid_status_is_error($status)) {
-                            # use default delay to reduce load
-                            my $delay = defined($d->{up}) ? int($d->{up}) : $default_delay;
-                            if ($delay > 0) {
-                                print STDERR "Waiting for $delay seconds (startup delay)\n"
-                                    if $d->{up};
-                                for (my $i = 0; $i < $delay; $i++) {
-                                    sleep(1);
-                                }
+                        while (scalar(keys $workers->%*) >= $max_workers) {
+                            for my $pid (keys $workers->%*) {
+                                next if PVE::ProcFSTools::check_process_running($pid);
+                                $finish_worker->($pid);
                             }
-                        } else {
-                            my $rendered_type = $d->{type} eq 'lxc' ? 'CT' : 'VM';
-                            print STDERR "Starting $rendered_type $vmid failed: $status\n";
+                            sleep(1);
                         }
                     };
                     warn $@ if $@;
+                }
+
+                while (scalar(keys %$workers)) {
+                    for my $pid (keys $workers->%*) {
+                        next if PVE::ProcFSTools::check_process_running($pid);
+                        $finish_worker->($pid);
+                    }
+                    sleep(1);
                 }
             }
             return;
@@ -2180,6 +2252,15 @@ __PACKAGE__->register_method({
                 minimum => 0,
                 maximum => 2 * 3600, # mostly arbitrary, but we do not want to high timeouts
             },
+            'max-workers' => {
+                description => "Defines the maximum number of tasks running concurrently. If "
+                    . " not set, uses 'max_workers' from datacenter.cfg, and if that's not set, the"
+                    . " available CPU threads, clamped to a maximum of 8, are used.",
+                optional => 1,
+                type => 'integer',
+                minimum => 1,
+                maximum => 64,
+            },
         },
     },
     returns => {
@@ -2207,12 +2288,9 @@ __PACKAGE__->register_method({
 
             $rpcenv->{type} = 'priv'; # to start tasks in background
 
-            my $stopList = $get_start_stop_list->($nodename, undef, $param->{vms});
+            my $stopList = get_start_stop_list($nodename, undef, $param->{vms});
 
-            my $cpuinfo = PVE::ProcFSTools::read_cpuinfo();
-            my $datacenterconfig = cfs_read_file('datacenter.cfg');
-            # if not set by user spawn max cpu count number of workers
-            my $maxWorkers = $datacenterconfig->{max_workers} || $cpuinfo->{cpus};
+            my $max_workers = get_max_workers($param);
 
             for my $order (sort { $b <=> $a } keys %$stopList) {
                 my $vmlist = $stopList->{$order};
@@ -2226,6 +2304,9 @@ __PACKAGE__->register_method({
                 };
 
                 for my $vmid (sort { $b <=> $a } keys %$vmlist) {
+
+                    PVE::Cluster::cfs_update(); # ensure modifications by hookscripts are visible
+
                     my $d = $vmlist->{$vmid};
                     my $timeout = int($d->{down} // $param->{timeout} // 180);
                     my $upid = eval {
@@ -2246,7 +2327,7 @@ __PACKAGE__->register_method({
                     my $pid = $task->{pid};
 
                     $workers->{$pid} = { type => $d->{type}, upid => $upid, vmid => $vmid };
-                    while (scalar(keys %$workers) >= $maxWorkers) {
+                    while (scalar(keys %$workers) >= $max_workers) {
                         foreach my $p (keys %$workers) {
                             if (!PVE::ProcFSTools::check_process_running($p)) {
                                 $finish_worker->($p);
@@ -2308,6 +2389,15 @@ __PACKAGE__->register_method({
                 format => 'pve-vmid-list',
                 optional => 1,
             },
+            'max-workers' => {
+                description => "Maximal number of parallel migration job. If not set, uses"
+                    . "'max_workers' from datacenter.cfg, and if that's not set the available'
+                    .' CPU threads, clamped to a maximum of 8, are used.",
+                optional => 1,
+                type => 'integer',
+                minimum => 1,
+                maximum => 64,
+            },
         },
     },
     returns => {
@@ -2336,12 +2426,9 @@ __PACKAGE__->register_method({
 
             $rpcenv->{type} = 'priv'; # to start tasks in background
 
-            my $toSuspendList = $get_start_stop_list->($nodename, undef, $param->{vms});
+            my $toSuspendList = get_start_stop_list($nodename, undef, $param->{vms});
 
-            my $cpuinfo = PVE::ProcFSTools::read_cpuinfo();
-            my $datacenterconfig = cfs_read_file('datacenter.cfg');
-            # if not set by user spawn max cpu count number of workers
-            my $maxWorkers = $datacenterconfig->{max_workers} || $cpuinfo->{cpus};
+            my $max_workers = get_max_workers($param);
 
             for my $order (sort { $b <=> $a } keys %$toSuspendList) {
                 my $vmlist = $toSuspendList->{$order};
@@ -2355,6 +2442,8 @@ __PACKAGE__->register_method({
                 };
 
                 for my $vmid (sort { $b <=> $a } keys %$vmlist) {
+                    PVE::Cluster::cfs_update(); # ensure modifications by hookscripts are visible
+
                     my $d = $vmlist->{$vmid};
                     if ($d->{type} ne 'qemu') {
                         log_warn("skipping $vmid, only VMs can be suspended");
@@ -2370,7 +2459,7 @@ __PACKAGE__->register_method({
                     my $pid = $task->{pid};
                     $workers->{$pid} = { type => $d->{type}, upid => $upid, vmid => $vmid };
 
-                    while (scalar(keys %$workers) >= $maxWorkers) {
+                    while (scalar(keys %$workers) >= $max_workers) {
                         for my $p (keys %$workers) {
                             if (!PVE::ProcFSTools::check_process_running($p)) {
                                 $finish_worker->($p);
@@ -2484,10 +2573,20 @@ __PACKAGE__->register_method({
             target => get_standard_option('pve-node', { description => "Target node." }),
             maxworkers => {
                 description => "Maximal number of parallel migration job. If not set, uses"
+                    . "'max_workers' from datacenter.cfg. One of both must be set!"
+                    . "Deprecated, use 'max-workers' instead.",
+                optional => 1,
+                type => 'integer',
+                minimum => 1,
+                maximum => 64,
+            },
+            'max-workers' => {
+                description => "Maximal number of parallel migration job. If not set, uses"
                     . "'max_workers' from datacenter.cfg. One of both must be set!",
                 optional => 1,
                 type => 'integer',
                 minimum => 1,
+                maximum => 64,
             },
             vms => {
                 description => "Only consider Guests with these IDs.",
@@ -2533,15 +2632,15 @@ __PACKAGE__->register_method({
 
         my $datacenterconfig = cfs_read_file('datacenter.cfg');
         # prefer parameter over datacenter cfg settings
-        my $maxWorkers =
-            $param->{maxworkers}
+        my $max_workers = $param->{'max-workers'}
+            || $param->{'maxworkers'} # alias
             || $datacenterconfig->{max_workers}
-            || die "either 'maxworkers' parameter or max_workers in datacenter.cfg must be set!\n";
+            || die "either 'max-workers' parameter or max_workers in datacenter.cfg must be set!\n";
 
         my $code = sub {
             $rpcenv->{type} = 'priv'; # to start tasks in background
 
-            my $vmlist = &$get_filtered_vmlist($nodename, $param->{vms}, 1, 1);
+            my $vmlist = get_filtered_vmlist($nodename, $param->{vms}, 1, 1);
             if (!scalar(keys %$vmlist)) {
                 warn "no virtual guests matched, nothing to do..\n";
                 return;
@@ -2550,6 +2649,8 @@ __PACKAGE__->register_method({
             my $workers = {};
             my $workers_started = 0;
             foreach my $vmid (sort keys %$vmlist) {
+                PVE::Cluster::cfs_update(); # ensure modifications by hookscripts are visible
+
                 my $d = $vmlist->{$vmid};
                 my $pid;
                 eval {
@@ -2562,7 +2663,7 @@ __PACKAGE__->register_method({
 
                 $workers_started++;
                 $workers->{$pid} = 1;
-                while (scalar(keys %$workers) >= $maxWorkers) {
+                while (scalar(keys %$workers) >= $max_workers) {
                     foreach my $p (keys %$workers) {
                         if (!PVE::ProcFSTools::check_process_running($p)) {
                             delete $workers->{$p};
@@ -2573,7 +2674,7 @@ __PACKAGE__->register_method({
             }
             while (scalar(keys %$workers)) {
                 foreach my $p (keys %$workers) {
-                    # FIXME: what about PID re-use ?!?!
+                    # FIXME: what about PID reuse ?!?!
                     if (!PVE::ProcFSTools::check_process_running($p)) {
                         delete $workers->{$p};
                     }

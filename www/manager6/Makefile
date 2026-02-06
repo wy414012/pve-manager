@@ -104,6 +104,7 @@ JSSRC= 							\
 	panel/BackupJobPrune.js				\
 	panel/HealthWidget.js				\
 	panel/IPSet.js					\
+	panel/IPView.js					\
 	panel/RunningChart.js				\
 	panel/StatusPanel.js				\
 	panel/GuestStatusView.js			\
@@ -120,6 +121,7 @@ JSSRC= 							\
 	window/BulkAction.js				\
 	window/CephInstall.js				\
 	window/Clone.js					\
+	window/ConfirmRemoveResource.js			\
 	window/FirewallEnableEdit.js			\
 	window/FirewallLograteEdit.js			\
 	window/LoginWindow.js				\
@@ -165,6 +167,7 @@ JSSRC= 							\
 	dc/Backup.js					\
 	dc/Cluster.js					\
 	dc/ClusterEdit.js				\
+	dc/CmdMenu.js					\
 	dc/Config.js					\
 	dc/CorosyncLinkEdit.js				\
 	dc/GroupEdit.js					\
@@ -202,6 +205,7 @@ JSSRC= 							\
 	lxc/DeviceEdit.js				\
 	lxc/DNS.js					\
 	lxc/FeaturesEdit.js				\
+	lxc/EnvEdit.js				\
 	lxc/MPEdit.js					\
 	lxc/MPResize.js					\
 	lxc/Network.js					\
@@ -239,7 +243,6 @@ JSSRC= 							\
 	pool/Config.js					\
 	pool/StatusView.js				\
 	pool/Summary.js					\
-	qemu/AgentIPView.js				\
 	qemu/AudioEdit.js				\
 	qemu/BootOrderEdit.js				\
 	qemu/CDEdit.js					\
@@ -275,9 +278,11 @@ JSSRC= 							\
 	qemu/SevEdit.js					\
 	qemu/Smbios1Edit.js				\
 	qemu/SystemEdit.js				\
+	qemu/TdxEdit.js					\
 	qemu/USBEdit.js					\
 	qemu/VirtiofsEdit.js				\
 	sdn/Browser.js					\
+	sdn/NetworkBrowser.js					\
 	sdn/ControllerView.js				\
 	sdn/Status.js					\
 	sdn/StatusView.js				\
@@ -289,6 +294,10 @@ JSSRC= 							\
 	sdn/SubnetView.js				\
 	sdn/ZoneContentView.js				\
 	sdn/ZoneContentPanel.js				\
+	sdn/ZoneBridgesPanel.js				\
+	sdn/ZoneBridgeView.js				\
+	sdn/EvpnZoneIpVrfPanel.js	\
+	sdn/EvpnZoneMacVrfPanel.js	\
 	sdn/FirewallPanel.js				\
 	sdn/FirewallVnetView.js				\
 	sdn/ZoneView.js					\
@@ -313,6 +322,7 @@ JSSRC= 							\
 	sdn/zones/VlanEdit.js				\
 	sdn/zones/VxlanEdit.js				\
 	sdn/FabricsView.js				\
+	sdn/FabricsContentView.js			\
 	sdn/fabrics/Common.js				\
 	sdn/fabrics/InterfacePanel.js			\
 	sdn/fabrics/NodeEdit.js				\

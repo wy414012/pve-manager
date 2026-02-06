@@ -3,6 +3,7 @@ package PVE::CLI::pveceph;
 use strict;
 use warnings;
 
+use AptPkg::Cache;
 use Data::Dumper;
 use Fcntl ':flock';
 use File::Path;
@@ -125,29 +126,33 @@ __PACKAGE__->register_method({
     method => 'POST',
     description => "Install ceph related packages.",
     parameters => {
-	additionalProperties => 0,
-	properties => {
-	    version => {
-		type => 'string',
-		enum => $available_ceph_release_codenames,
-		default => $default_ceph_version,
-		description => "Ceph version to install.",
-		optional => 1,
-	    },
-	    repository => {
-		type => 'string',
-		enum => ['enterprise', 'no-subscription', 'test'],
-		default => 'no-subscription',
-		description => "Ceph repository to use.",
-		optional => 1,
-	    },
-	    'allow-experimental' => {
-		type => 'boolean',
-		default => 0,
-		optional => 1,
-		description => "Allow experimental versions. Use with care!",
-	    },
-	},
+        additionalProperties => 0,
+        properties => {
+            version => {
+                type => 'string',
+                enum => $available_ceph_release_codenames,
+                default => $default_ceph_version,
+                description => "Ceph version to install.",
+                optional => 1,
+            },
+            repository => {
+                type => 'string',
+                enum => ['enterprise', 'no-subscription', 'test', 'manual'],
+                default => 'no-subscription',
+                description => "Ceph repository to use. The 'manual' option will not configure"
+                    . " any repositories. Use it if the host cannot access the public repositories,"
+                    . " for example if Proxmox Offline Mirror is used. A repository that contains"
+                    . " the Ceph packages for the version needs to be manually configured before"
+                    . " starting the installation!",
+                optional => 1,
+            },
+            'allow-experimental' => {
+                type => 'boolean',
+                default => 0,
+                optional => 1,
+                description => "Allow experimental versions. Use with care!",
+            },
+        },
     },
     returns => { type => 'null' },
     code => sub {
@@ -155,29 +160,50 @@ __PACKAGE__->register_method({
 
         my $cephver = $param->{version} || $default_ceph_version;
 
-	my $repo = $param->{'repository'} // 'no-subscription';
-	my $enterprise_repo = $repo eq 'enterprise';
-	my $cdn = $enterprise_repo ? 'https://enterprise.proxmox.com' : 'https://mirrors.ustc.edu.cn/proxmox';
-
-        if (has_valid_subscription()) {
-            warn
-                "\nNOTE: The node has an active subscription but a non-production Ceph repository selected.\n\n"
-                if !$enterprise_repo;
-        } elsif ($enterprise_repo) {
-            warn "\nWARN: Enterprise repository selected, but no active subscription!\n\n";
-        } elsif ($repo eq 'no-subscription') {
-            warn
-                "\nHINT: The no-subscription repository is not the best choice for production setups.\n"
-                . "Proxmox recommends using the enterprise repository with a valid subscription.\n";
-        } else {
-            warn
-                "\nWARN: The test repository should only be used for test setups or after consulting"
-                . " the official Proxmox support!\n\n";
-        }
-
         my $available_ceph_releases = PVE::Ceph::Releases::get_all_available_ceph_releases();
         die "unsupported ceph version: $cephver"
             if !exists($available_ceph_releases->{$cephver});
+
+        my $experimental_release = !!$available_ceph_releases->{$cephver}->{unsupported};
+
+        my $repo = $param->{'repository'} // 'no-subscription';
+        my $enterprise_repo = $repo eq 'enterprise';
+        my $cdn =
+            $enterprise_repo ? 'https://enterprise.proxmox.com' : 'https://mirrors.ustc.edu.cn/proxmox';
+
+        if ($experimental_release && $enterprise_repo) {
+            warn "\nWARN: Enterprise repository selected, but Ceph release is still marked as"
+                . " experimental, repository might not (yet) be useable!\n\n";
+
+            if (-t STDOUT) {
+                print "Do you want to switch to the test repository (Y/n)? ";
+                my $answer = <STDIN> // '';
+                chomp $answer;
+                if (!$answer || $answer =~ m/^\s*y(?:es)?\s*$/i) {
+                    $repo = 'test';
+                    $enterprise_repo = 0;
+                    $cdn = 'http://download.proxmox.com';
+                }
+            }
+        } elsif (has_valid_subscription()) {
+            if (!$enterprise_repo) {
+                warn "\nNOTE: The node has an active subscription but a non-production Ceph"
+                    . " repository selected.\n\n";
+            }
+        } elsif ($enterprise_repo) {
+            warn "\nWARN: Enterprise repository selected, but no active subscription!\n\n";
+        } elsif ($repo eq 'no-subscription') {
+            warn "\nHINT: The no-subscription repository is not the best choice for production"
+                . " setups.\n"
+                . "Proxmox recommends using the enterprise repository with a valid subscription.\n";
+        } elsif ($repo eq 'manual') {
+            warn "\nHINT: The manual repository option expects that the Ceph repository is"
+                . " already correctly configured. For example, when used in combination with"
+                . " Proxmox Offline Mirror.\n";
+        } else {
+            warn "\nWARN: The test repository should only be used for test setups or after"
+                . " consulting the official Proxmox support!\n\n";
+        }
 
         my $repo_source = <<"EOF";
 Types: deb
@@ -198,22 +224,24 @@ EOF
             die "Aborting installation as requested\n" if !$continue;
         }
 
-        PVE::Tools::file_set_contents("/etc/apt/sources.list.d/ceph.sources", $repo_source);
+        if ($repo ne "manual") {
+            PVE::Tools::file_set_contents("/etc/apt/sources.list.d/ceph.sources", $repo_source);
 
-        if ($available_ceph_releases->{$cephver}->{unsupported}) {
-            if ($param->{'allow-experimental'}) {
-                warn
-                    "NOTE: installing experimental/tech-preview Ceph release ${rendered_release}!\n";
-            } elsif (-t STDOUT) {
-                print
-                    "Ceph ${rendered_release} is currently considered a technology preview for Proxmox VE - continue (y/N)? ";
-                my $answer = <STDIN>;
-                my $continue = defined($answer) && $answer =~ m/^\s*y(?:es)?\s*$/i;
+            if ($experimental_release) {
+                if ($param->{'allow-experimental'}) {
+                    warn
+                        "NOTE: installing experimental/tech-preview Ceph release ${rendered_release}!\n";
+                } elsif (-t STDOUT) {
+                    print "Ceph ${rendered_release} is currently considered a technology"
+                        . " preview for Proxmox VE - continue (y/N)? ";
+                    my $answer = <STDIN>;
+                    my $continue = defined($answer) && $answer =~ m/^\s*y(?:es)?\s*$/i;
 
-                die "Aborting installation as requested\n" if !$continue;
-            } else {
-                die
-                    "refusing to install tech-preview Ceph release ${rendered_release} without 'allow-experimental' parameter!\n";
+                    die "Aborting installation as requested\n" if !$continue;
+                } else {
+                    die "Refusing to install tech-preview Ceph release ${rendered_release}"
+                        . " without 'allow-experimental' parameter!\n";
+                }
             }
         }
 
@@ -226,6 +254,25 @@ EOF
                 errfunc => sub { print STDERR "$_[0]\n" },
             );
         };
+
+        if ($repo eq "manual") {
+            my $apt_cache = AptPkg::Cache->new() || die "unable to initialize AptPkg::Cache\n";
+            my @ceph_versions = $apt_cache->{'ceph-common:amd64'}->{'VersionList'}->@*;
+            my $latest_available = $ceph_versions[0]->{'VerStr'};
+            my $selected_version =
+                PVE::Ceph::Releases::get_ceph_release_info($cephver)->{'release'};
+
+            if ($latest_available !~ "^$selected_version") {
+                die "Selected Ceph version '${selected_version}' does not match the available"
+                    . " version in the repository '${latest_available}' \n";
+            }
+
+            my $pkg_infos = $ceph_versions[0]->{'FileList'}->[0]->{'File'};
+            print "\nUsing the following manual repository:\n"
+                . "Site:\t\t $pkg_infos->{'Site'}\n"
+                . "Component:\t $pkg_infos->{'Component'}\n\n";
+
+        }
 
         my @apt_install =
             qw(apt-get --no-install-recommends -o Dpkg::Options::=--force-confnew install --);

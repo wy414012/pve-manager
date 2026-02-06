@@ -15,6 +15,8 @@ use PVE::CpuSet;
 use Filesys::Df;
 use PVE::INotify;
 use PVE::Network;
+use PVE::Network::SDN::Zones;
+use PVE::RS::SDN::Fabrics;
 use PVE::NodeConfig;
 use PVE::Cluster qw(cfs_read_file);
 use PVE::Storage;
@@ -36,12 +38,6 @@ use PVE::PullMetric;
 use PVE::Status::Plugin;
 
 use base qw(PVE::Daemon);
-
-my $have_sdn;
-eval {
-    require PVE::Network::SDN;
-    $have_sdn = 1;
-};
 
 my $opt_debug;
 my $restart_request;
@@ -766,13 +762,32 @@ sub update_ceph_metadata {
 }
 
 sub update_sdn_status {
+    my ($zone_status, $vnet_status) = PVE::Network::SDN::Zones::status();
 
-    if ($have_sdn) {
-        my ($transport_status, $vnet_status) = PVE::Network::SDN::status();
+    my $status = $zone_status ? encode_json($zone_status) : undef;
+    PVE::Cluster::broadcast_node_kv("sdn", $status);
+}
 
-        my $status = $transport_status ? encode_json($transport_status) : undef;
-        PVE::Cluster::broadcast_node_kv("sdn", $status);
+sub update_network_status {
+    my $network_status = {};
+
+    my ($fabric_status) = PVE::RS::SDN::Fabrics::status();
+    for my $fabric (values $fabric_status->%*) {
+        $network_status->{"fabric/$fabric->{network}"} = $fabric;
     }
+
+    my ($zone_status, $vnet_status) = PVE::Network::SDN::Zones::status();
+    for my $id (sort keys $zone_status->%*) {
+        my $zone = $zone_status->{$id};
+
+        $zone->{'network-type'} = 'zone';
+        $zone->{network} = $id;
+        $zone->{type} = 'network';
+
+        $network_status->{"zone/$id"} = $zone;
+    }
+
+    PVE::Cluster::broadcast_node_kv("network", encode_json($network_status));
 }
 
 my $broadcast_version_info_done = 0;
@@ -839,6 +854,10 @@ sub update_status {
     eval { update_sdn_status(); };
     $err = $@;
     syslog('err', "sdn status update error: $err") if $err;
+
+    eval { update_network_status(); };
+    $err = $@;
+    syslog('err', "network status update error: $err") if $err;
 
     eval { broadcast_version_info(); };
     $err = $@;

@@ -107,7 +107,7 @@ my $assemble_pkginfo = sub {
     if (my $desc = $info->{LongDesc}) {
         $desc =~ s/^.*\n\s?//; # remove first line
         $desc =~ s/\n / /g;
-        $data->{Description} = $desc;
+        $data->{Description} = decode('UTF-8', $desc);
     }
 
     foreach my $k (qw(Section Arch Priority)) {
@@ -188,7 +188,7 @@ my $update_pve_pkgstatus = sub {
         }
     }
 
-    # keep notification status (avoid sending mails abou new packages more than once)
+    # keep notification status (avoid sending mails about new packages more than once)
     foreach my $pi (@$pkglist) {
         if (my $ns = $notify_status->{ $pi->{Package} }) {
             $pi->{NotifyStatus} = $ns if $ns eq $pi->{Version};
@@ -198,6 +198,52 @@ my $update_pve_pkgstatus = sub {
     PVE::Tools::file_set_contents($pve_pkgstatus_fn, encode_json($pkglist));
 
     return $pkglist;
+};
+
+my $apt_package_return_props = {
+    Arch => {
+        type => 'string',
+        description => 'Package Architecture.',
+        enum => [qw(armhf arm64 amd64 ppc64el risc64 s390x all)],
+    },
+    Description => {
+        type => 'string',
+        description => 'Package description.',
+    },
+    NotifyStatus => {
+        type => 'string',
+        description => 'Version for which PVE has already sent an update notification for.',
+        optional => 1,
+    },
+    OldVersion => {
+        type => 'string',
+        description => 'Old version currently installed.',
+        optional => 1,
+    },
+    Origin => {
+        type => 'string',
+        description => "Package origin, e.g., 'Proxmox' or 'Debian'.",
+    },
+    Package => {
+        type => 'string',
+        description => 'Package name.',
+    },
+    Priority => {
+        type => 'string',
+        description => 'Package priority.',
+    },
+    Section => {
+        type => 'string',
+        description => 'Package section.',
+    },
+    Title => {
+        type => 'string',
+        description => 'Package title.',
+    },
+    Version => {
+        type => 'string',
+        description => 'New version to be updated to.',
+    },
 };
 
 __PACKAGE__->register_method({
@@ -220,51 +266,7 @@ __PACKAGE__->register_method({
         type => "array",
         items => {
             type => "object",
-            properties => {
-                'Arch' => {
-                    type => 'string',
-                    description => 'Package Architecture.',
-                },
-                'Description' => {
-                    type => 'string',
-                    description => 'Human-readable package description.',
-                },
-                'NotifyStatus' => {
-                    type => 'string',
-                    description =>
-                        'Version for which PVE has already sent an update notification for.',
-                    optional => 1,
-                },
-                'OldVersion' => {
-                    type => 'string',
-                    description => 'Old version currently installed.',
-                    optional => 1,
-                },
-                'Origin' => {
-                    type => 'string',
-                    description => 'Package origin.',
-                },
-                'Package' => {
-                    type => 'string',
-                    description => 'Package name.',
-                },
-                'Priority' => {
-                    type => 'string',
-                    description => 'Package priority in human-readable form.',
-                },
-                'Section' => {
-                    type => 'string',
-                    description => 'Package section.',
-                },
-                'Title' => {
-                    type => 'string',
-                    description => 'Package title.',
-                },
-                'Version' => {
-                    type => 'string',
-                    description => 'New version to be updated to.',
-                },
-            },
+            properties => $apt_package_return_props,
         },
     },
     code => sub {
@@ -432,6 +434,7 @@ __PACKAGE__->register_method({
             node => get_standard_option('pve-node'),
             name => {
                 description => "Package name.",
+                pattern => qr/[a-z0-9][-+.a-z0-9:]+/,
                 type => 'string',
             },
             version => {
@@ -449,7 +452,7 @@ __PACKAGE__->register_method({
 
         my $pkgname = $param->{name};
 
-        my $cmd = ['apt-get', 'changelog', '-qq'];
+        my $cmd = ['apt-get', 'changelog', '-qq', '--'];
         if (my $version = $param->{version}) {
             push @$cmd, "$pkgname=$version";
         } else {
@@ -788,7 +791,27 @@ __PACKAGE__->register_method({
         type => "array",
         items => {
             type => "object",
-            properties => {},
+            properties => {
+                $apt_package_return_props->%*,
+                CurrentState => {
+                    type => 'string',
+                    description => 'Current state of the package installed on the system.',
+                    # Possible CurrentState variants according to AptPkg::Cache
+                    enum => [
+                        qw(Installed NotInstalled UnPacked HalfConfigured HalfInstalled ConfigFiles)
+                    ],
+                },
+                RunningKernel => {
+                    type => 'string',
+                    description => "Kernel release, only for package 'proxmox-ve'.",
+                    optional => 1,
+                },
+                ManagerVersion => {
+                    type => 'string',
+                    description => "Version of the currently running pve-manager API server.",
+                    optional => 1,
+                },
+            },
         },
     },
     code => sub {

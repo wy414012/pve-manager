@@ -41,6 +41,9 @@ Ext.define('PVE.window.Restore', {
             if (values.start && !values['live-restore']) {
                 params.start = 1;
             }
+            if (values['ha-managed']) {
+                params['ha-managed'] = 1;
+            }
             if (values['live-restore']) {
                 params['live-restore'] = 1;
             }
@@ -93,12 +96,11 @@ Ext.define('PVE.window.Restore', {
             };
 
             if (view.vmid) {
-                confirmMsg += `. ${Ext.String.format(
-                    gettext('This will permanently erase current {0} data.'),
-                    view.vmtype === 'lxc' ? 'CT' : 'VM',
-                )}`;
                 if (view.vmtype === 'lxc') {
+                    confirmMsg += `. ${gettext('This will permanently erase current CT data.')}`;
                     confirmMsg += `<br>${gettext('Mount point volumes are also erased.')}`;
+                } else {
+                    confirmMsg += `. ${gettext('This will permanently erase current VM data.')}`;
                 }
                 Ext.Msg.confirm(gettext('Confirm'), confirmMsg, function (btn) {
                     if (btn === 'yes') {
@@ -238,6 +240,15 @@ Ext.define('PVE.window.Restore', {
                         flex: 1,
                         fieldLabel: gettext('Start after restore'),
                         labelWidth: 105,
+                        checked: false,
+                    },
+                    {
+                        xtype: 'proxmoxcheckbox',
+                        name: 'ha-managed',
+                        reference: 'ha-managed',
+                        flex: 1,
+                        fieldLabel: gettext('Add to HA'),
+                        labelWidth: 120,
                         checked: false,
                     },
                 ],

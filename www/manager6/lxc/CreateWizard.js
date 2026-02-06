@@ -82,6 +82,13 @@ Ext.define('PVE.lxc.CreateWizard', {
                     },
                     fieldLabel: gettext('Nesting'),
                 },
+                {
+                    xtype: 'proxmoxcheckbox',
+                    name: 'ha-managed',
+                    // only submit value of checkbox if checked
+                    uncheckedValue: undefined,
+                    fieldLabel: gettext('Add to HA'),
+                },
             ],
             column2: [
                 {

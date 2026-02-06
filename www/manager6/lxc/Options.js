@@ -90,7 +90,6 @@ Ext.define('PVE.lxc.Options', {
                               name: 'tty',
                               minValue: 0,
                               maxValue: 6,
-                              value: 2,
                               fieldLabel: gettext('TTY count'),
                               emptyText: gettext('Default'),
                               deleteEmpty: true,
@@ -152,6 +151,42 @@ Ext.define('PVE.lxc.Options', {
             },
             hookscript: {
                 header: gettext('Hookscript'),
+                renderer: Ext.htmlEncode,
+            },
+            entrypoint: {
+                header: gettext('Entrypoint'),
+                defaultValue: '/sbin/init',
+                renderer: Ext.htmlEncode,
+                editor: caps.vms['VM.Config.Options']
+                    ? {
+                          xtype: 'proxmoxWindowEdit',
+                          subject: gettext('Entrypoint Init Command'),
+                          defaultFocus: undefined,
+                          items: [
+                              {
+                                  xtype: 'proxmoxtextfield',
+                                  name: 'entrypoint',
+                                  deleteEmpty: true,
+                                  emptyText: '/sbin/init',
+                              },
+
+                              {
+                                  xtype: 'displayfield',
+                                  reference: 'emptyWarning',
+                                  userCls: 'pmx-hint',
+                                  value: gettext(
+                                      'Changing the entrypoint command can lead to start failure!',
+                                  ),
+                              },
+                          ],
+                      }
+                    : undefined,
+            },
+            env: {
+                header: gettext('Environment'),
+                renderer: (v) => (v ? Ext.htmlEncode(v.replaceAll(/\0+/g, ' ')) : null),
+                defaultValue: Proxmox.Utils.noneText,
+                editor: 'PVE.lxc.EnvEdit',
             },
         };
 

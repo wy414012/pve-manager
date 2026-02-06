@@ -25,6 +25,10 @@ Ext.define('PVE.tree.ResourceTree', {
                 iconCls: 'fa fa-th',
                 text: gettext('SDN'),
             },
+            network: {
+                iconCls: 'fa fa-globe',
+                text: gettext('Network'),
+            },
             qemu: {
                 iconCls: 'fa fa-desktop',
                 text: gettext('Virtual Machine'),
@@ -42,6 +46,48 @@ Ext.define('PVE.tree.ResourceTree', {
         },
     },
 
+    columns: [
+        {
+            xtype: 'treecolumn',
+            flex: 1,
+            dataIndex: 'text',
+            renderer: function (val, meta, rec) {
+                let info = rec.data;
+
+                let text = info.text;
+                let status = '';
+                if (info.type === 'storage') {
+                    let usage = info.disk / info.maxdisk;
+                    if (usage >= 0.0 && usage <= 1.0) {
+                        let barHeight = (usage * 100).toFixed(0);
+                        let remainingHeight = (100 - barHeight).toFixed(0);
+                        status = '<div class="usage-wrapper">';
+                        status += `<div class="usage-negative" style="height: ${remainingHeight}%"></div>`;
+                        status += `<div class="usage" style="height: ${barHeight}%"></div>`;
+                        status += '</div> ';
+                    }
+                }
+                if (Ext.isNumeric(info.vmid) && info.vmid > 0) {
+                    if (PVE.UIOptions.getTreeSortingValue('sort-field') !== 'vmid') {
+                        text = `${info.name} (${String(info.vmid)})`;
+                    }
+                }
+                text = `<span>${status}${text}</span>`;
+                text += PVE.Utils.renderTags(info.tags, PVE.UIOptions.tagOverrides);
+
+                if (info.id === 'root' && PVE.ClusterName) {
+                    text += ` (${PVE.ClusterName})`;
+                }
+
+                if (info.type === 'pool' && PVE.UIOptions.getTreeSortingValue('nest-pools')) {
+                    text = info.pool.split('/').pop();
+                }
+
+                return (info.renderedText = text);
+            },
+        },
+    ],
+
     useArrows: true,
 
     // private
@@ -55,6 +101,8 @@ Ext.define('PVE.tree.ResourceTree', {
                 return 2;
             case 'sdn':
                 return 3;
+            case 'network':
+                return 3.5;
             case 'storage':
                 return 4;
             default:
@@ -130,30 +178,6 @@ Ext.define('PVE.tree.ResourceTree', {
         }
     },
 
-    setText: function (info) {
-        let _me = this;
-
-        let status = '';
-        if (info.type === 'storage') {
-            let usage = info.disk / info.maxdisk;
-            if (usage >= 0.0 && usage <= 1.0) {
-                let barHeight = (usage * 100).toFixed(0);
-                let remainingHeight = (100 - barHeight).toFixed(0);
-                status = '<div class="usage-wrapper">';
-                status += `<div class="usage-negative" style="height: ${remainingHeight}%"></div>`;
-                status += `<div class="usage" style="height: ${barHeight}%"></div>`;
-                status += '</div> ';
-            }
-        }
-        if (Ext.isNumeric(info.vmid) && info.vmid > 0) {
-            if (PVE.UIOptions.getTreeSortingValue('sort-field') !== 'vmid') {
-                info.text = `${info.name} (${String(info.vmid)})`;
-            }
-        }
-        info.text = `<span>${status}${info.text}</span>`;
-        info.text += PVE.Utils.renderTags(info.tags, PVE.UIOptions.tagOverrides);
-    },
-
     getToolTip: function (info) {
         let qtips = [];
         if (info.qmpstatus || info.status) {
@@ -182,11 +206,28 @@ Ext.define('PVE.tree.ResourceTree', {
     },
 
     // private
-    addChildSorted: function (node, info) {
+    addChildSorted: function (node, info, insertPool = false) {
         let me = this;
 
         me.setIconCls(info);
-        me.setText(info);
+
+        let nestPools = PVE.UIOptions.getTreeSortingValue('nest-pools');
+        if (info.type === 'pool' && info.pool && !insertPool && nestPools) {
+            let parentPool = info.pool.split('/').slice(0, -1).join('/');
+            if (parentPool.length > 0) {
+                let parent = node.findChild('id', `/pool/${parentPool}`, true);
+                if (parent !== node) {
+                    if (!parent) {
+                        parent = me.addChildSorted(node, {
+                            type: 'pool',
+                            id: `/pool/${parentPool}`,
+                            pool: parentPool,
+                        });
+                    }
+                    return me.addChildSorted(parent, info, true);
+                }
+            }
+        }
 
         if (info.groupbyid) {
             if (me.viewFilter.groupRenderer) {
@@ -220,7 +261,7 @@ Ext.define('PVE.tree.ResourceTree', {
         let v = info[groupBy];
 
         if (v) {
-            let group = node.findChild('groupbyid', v);
+            let group = node.findChild('groupbyid', v, true);
             if (!group) {
                 let groupinfo;
                 if (info.type === groupBy) {
@@ -234,7 +275,6 @@ Ext.define('PVE.tree.ResourceTree', {
                         groupinfo[groupBy] = v;
                     }
                 }
-                groupinfo.leaf = false;
                 groupinfo.groupbyid = v;
                 group = me.addChildSorted(node, groupinfo);
             }
@@ -252,7 +292,7 @@ Ext.define('PVE.tree.ResourceTree', {
     saveSortingOptions: function () {
         let me = this;
         let changed = false;
-        for (const key of ['sort-field', 'group-templates', 'group-guest-types']) {
+        for (const key of ['sort-field', 'group-templates', 'group-guest-types', 'nest-pools']) {
             let newValue = PVE.UIOptions.getTreeSortingValue(key);
             if (me[key] !== newValue) {
                 me[key] = newValue;
@@ -408,7 +448,6 @@ Ext.define('PVE.tree.ResourceTree', {
                         info.id = oldid;
                     }
                     me.setIconCls(info);
-                    me.setText(info);
                     olditem.commit();
                 }
                 if ((!item || moved) && olditem.isLeaf()) {
@@ -538,20 +577,7 @@ Ext.define('PVE.tree.ResourceTree', {
             },
             setViewFilter: function (view) {
                 me.viewFilter = view;
-                me.clearTree();
-                updateTree();
-            },
-            setDatacenterText: function (clustername) {
-                let rootnode = me.store.getRootNode();
-
-                let rnodeText = gettext('Datacenter');
-                if (clustername !== undefined) {
-                    rnodeText += ' (' + clustername + ')';
-                }
-
-                rootnode.beginEdit();
-                rootnode.data.text = rnodeText;
-                rootnode.commit();
+                me.refreshTree();
             },
             clearTree: function () {
                 pdata.updateCount = 0;
@@ -560,6 +586,10 @@ Ext.define('PVE.tree.ResourceTree', {
                 rootnode.removeAll();
                 pdata.dataIndex = {};
                 me.getSelectionModel().deselectAll();
+            },
+            refreshTree: function () {
+                me.clearTree();
+                updateTree();
             },
             selectExpand: function (node) {
                 let sm = me.getSelectionModel();
@@ -609,7 +639,6 @@ Ext.define('PVE.tree.ResourceTree', {
                         node.beginEdit();
                         let info = node.data;
                         me.setIconCls(info);
-                        me.setText(info);
                         if (me.viewFilter.groupRenderer) {
                             info.text = me.viewFilter.groupRenderer(info);
                         }

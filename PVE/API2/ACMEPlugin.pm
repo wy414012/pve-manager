@@ -50,6 +50,18 @@ my $modify_cfg_for_api = sub {
     return $plugin_cfg;
 };
 
+my $acme_challenge_create_schema = PVE::ACME::Challenge->createSchema();
+my $acme_challenge_return_schema = {
+    type => "object",
+    properties => {
+        PVE::ACME::Challenge->createSchema()->{properties}->%*,
+        digest => get_standard_option('pve-config-digest'),
+        plugin => get_standard_option('pve-acme-pluginid'),
+    },
+};
+# replaced by plugin property
+delete $acme_challenge_return_schema->{properties}->{id};
+
 __PACKAGE__->register_method({
     name => 'index',
     path => '',
@@ -72,12 +84,7 @@ __PACKAGE__->register_method({
     },
     returns => {
         type => 'array',
-        items => {
-            type => "object",
-            properties => {
-                plugin => get_standard_option('pve-acme-pluginid'),
-            },
-        },
+        items => $acme_challenge_return_schema,
         links => [{ rel => 'child', href => "{plugin}" }],
     },
     code => sub {
@@ -111,9 +118,7 @@ __PACKAGE__->register_method({
             id => get_standard_option('pve-acme-pluginid'),
         },
     },
-    returns => {
-        type => 'object',
-    },
+    returns => $acme_challenge_return_schema,
     code => sub {
         my ($param) = @_;
 
@@ -131,7 +136,7 @@ __PACKAGE__->register_method({
         check => ['perm', '/', ['Sys.Modify']],
     },
     protected => 1,
-    parameters => PVE::ACME::Challenge->createSchema(),
+    parameters => $acme_challenge_create_schema,
     returns => {
         type => "null",
     },
