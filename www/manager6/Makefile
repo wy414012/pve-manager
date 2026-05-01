@@ -5,6 +5,7 @@ BIOME ?= proxmox-biome
 JSSRC= 							\
 	Parser.js					\
 	StateProvider.js				\
+	qemu/Architecture.js				\
 	Utils.js					\
 	UIOptions.js					\
 	Toolkit.js					\
@@ -17,6 +18,7 @@ JSSRC= 							\
 	data/ResourceStore.js				\
 	data/model/RRDModels.js				\
 	container/TwoColumnContainer.js			\
+	form/FilteredKVComboBox.js			\
 	form/ACMEAPISelector.js 			\
 	form/ACMEAccountSelector.js			\
 	form/ACMEPluginSelector.js			\
@@ -27,6 +29,7 @@ JSSRC= 							\
 	form/BridgeSelector.js				\
 	form/BusTypeSelector.js				\
 	form/CPUModelSelector.js			\
+	form/CRSOptions.js				\
 	form/CacheTypeSelector.js			\
 	form/CalendarEvent.js				\
 	form/CephPoolSelector.js			\
@@ -62,6 +65,7 @@ JSSRC= 							\
 	form/PreallocationSelector.js			\
 	form/PrivilegesSelector.js			\
 	form/QemuBiosSelector.js			\
+	form/QemuMachineSelector.js			\
 	form/SDNControllerSelector.js			\
 	form/SDNZoneSelector.js				\
 	form/SDNVnetSelector.js				\
@@ -267,6 +271,7 @@ JSSRC= 							\
 	qemu/NetworkEdit.js				\
 	qemu/OSDefaults.js				\
 	qemu/OSTypeEdit.js				\
+	qemu/OSPanel.js					\
 	qemu/Options.js					\
 	qemu/PCIEdit.js					\
 	qemu/ProcessorEdit.js				\
@@ -286,6 +291,7 @@ JSSRC= 							\
 	sdn/ControllerView.js				\
 	sdn/Status.js					\
 	sdn/StatusView.js				\
+	sdn/SdnDiffView.js				\
 	sdn/VnetEdit.js					\
 	sdn/VnetView.js					\
 	sdn/VnetACLView.js				\

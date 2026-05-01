@@ -47,7 +47,7 @@ Ext.define('PVE.Utils', {
 
         kvm_ostypes: {
             Linux: [
-                { desc: '6.x - 2.6 Kernel', val: 'l26' },
+                { desc: '7.x - 2.6 Kernel', val: 'l26' },
                 { desc: '2.4 Kernel', val: 'l24' },
             ],
             'Microsoft Windows': [
@@ -489,6 +489,8 @@ Ext.define('PVE.Utils', {
                     displayText = map[value] || Proxmox.Utils.unknownText;
                 } else if (key === 'freeze-fs-on-backup' && PVE.Parser.parseBoolean(value)) {
                     continue;
+                } else if (key === 'freeze-fs' && PVE.Parser.parseBoolean(value)) {
+                    continue;
                 } else if (PVE.Parser.parseBoolean(value)) {
                     displayText = Proxmox.Utils.enabledText;
                 }
@@ -498,13 +500,22 @@ Ext.define('PVE.Utils', {
             return agentstring;
         },
 
-        render_qemu_machine: function (value) {
-            return value || Proxmox.Utils.defaultText + ' (i440fx)';
+        render_qemu_machine: function (value, arch = 'x86_64') {
+            let machineTextMap = {
+                pc: 'i440fx',
+            };
+            if (!value) {
+                let machine = PVE.qemu.Architecture.defaultMachines[arch];
+                let machineText = machineTextMap[machine] ?? machine;
+                return `${Proxmox.Utils.defaultText} (${machineText})`;
+            }
+            return value;
         },
 
-        render_qemu_bios: function (value) {
+        render_qemu_bios: function (value, arch = 'x86_64') {
             if (!value) {
-                return Proxmox.Utils.defaultText + ' (SeaBIOS)';
+                let defaultBios = arch === 'aarch64' ? 'OVMF (UEFI)' : 'SeaBIOS';
+                return `${Proxmox.Utils.defaultText} (${defaultBios})`;
             } else if (value === 'seabios') {
                 return 'SeaBIOS';
             } else if (value === 'ovmf') {
@@ -1363,6 +1374,31 @@ Ext.define('PVE.Utils', {
             return retVal.length < 1 ? value : retVal;
         },
 
+        render_tfa: function (v, _mD, record) {
+            let tfa_type = PVE.Parser.parseTfaType(v);
+            if (tfa_type === undefined) {
+                return Proxmox.Utils.noText;
+            }
+
+            if (tfa_type !== 1) {
+                return tfa_type;
+            }
+
+            let locked_until = record.data['tfa-locked-until'];
+            if (locked_until !== undefined) {
+                let now = new Date().getTime() / 1000;
+                if (locked_until > now) {
+                    return gettext('Locked');
+                }
+            }
+
+            if (record.data['totp-locked']) {
+                return gettext('TOTP Locked');
+            }
+
+            return Proxmox.Utils.yesText;
+        },
+
         windowHostname: function () {
             return window.location.hostname.replace(
                 Proxmox.Utils.IP6_bracket_match,
@@ -1926,10 +1962,8 @@ Ext.define('PVE.Utils', {
             return true;
         },
 
-        sortByPreviousUsage: function (vmconfig, controllerList) {
-            if (!controllerList) {
-                controllerList = ['ide', 'virtio', 'scsi', 'sata'];
-            }
+        sortByPreviousUsage: function (vmconfig, nodename) {
+            let controllerList = ['ide', 'virtio', 'scsi', 'sata'];
             let usedControllers = {};
             for (const type of Object.keys(PVE.Utils.diskControllerMaxIDs)) {
                 usedControllers[type] = 0;
@@ -1945,7 +1979,8 @@ Ext.define('PVE.Utils', {
                 }
             }
 
-            let sortPriority = PVE.qemu.OSDefaults.getDefaults(vmconfig.ostype).busPriority;
+            let arch = PVE.qemu.Architecture.getGuestArchitecture(vmconfig.arch, nodename);
+            let sortPriority = PVE.qemu.OSDefaults.getDefaults(vmconfig.ostype, arch).busPriority;
 
             let sortedList = Ext.clone(controllerList);
             sortedList.sort(function (a, b) {

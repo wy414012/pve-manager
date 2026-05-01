@@ -428,6 +428,11 @@ __PACKAGE__->register_method({
                     format => 'pve-storage-content-list',
                     optional => 1,
                 },
+                shared => {
+                    description => "Determines whether the storage is shared",
+                    type => 'boolean',
+                    optional => 1,
+                },
                 plugintype => {
                     description => "More specific type, if available.",
                     type => 'string',
@@ -482,6 +487,13 @@ __PACKAGE__->register_method({
                     description =>
                         "The protocol of a fabric (for type 'network', network-type 'fabric').",
                     type => "string",
+                    optional => 1,
+                },
+                'host-arch' => {
+                    description => "The node's CPU architecture. (for type 'node').",
+                    type => 'string',
+                    enum => [qw(x86_64 aarch64)],
+                    default => 'x86_64',
                     optional => 1,
                 },
             },
@@ -607,6 +619,9 @@ __PACKAGE__->register_method({
                 my $info = eval { decode_json($static_node_info->{$node}); };
                 if (defined(my $mode = $info->{'cgroup-mode'})) {
                     $entry->{'cgroup-mode'} = int($mode);
+                }
+                if (defined(my $host_arch = $info->{'host-arch'})) {
+                    $entry->{'host-arch'} = $host_arch;
                 }
                 if (defined(my $status = $hastatus->{node_status}->{$node})) {
                     $entry->{'hastate'} = $status;

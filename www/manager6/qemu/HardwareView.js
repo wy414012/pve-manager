@@ -66,6 +66,12 @@ Ext.define('PVE.qemu.HardwareView', {
         };
 
         let rows = {
+            arch: {
+                header: gettext('vCPU Architecture'),
+                tdCls: 'pve-itype-icon-cpu',
+                never_delete: true,
+                renderer: PVE.qemu.Architecture.render_vcpu_architecture,
+            },
             memory: {
                 header: gettext('Memory'),
                 editor: caps.vms['VM.Config.Memory'] ? 'PVE.qemu.MemoryEdit' : undefined,
@@ -187,13 +193,17 @@ Ext.define('PVE.qemu.HardwareView', {
                 defaultValue: '',
                 renderer: function (value, metaData, record, rowIndex, colIndex, store, pending) {
                     let ostype = me.getObjectValue('ostype', undefined, pending);
+                    let arch = PVE.qemu.Architecture.getGuestArchitecture(
+                        me.getObjectValue('arch'),
+                        nodename,
+                    );
                     if (
                         PVE.Utils.is_windows(ostype) &&
                         (!value || value === 'pc' || value === 'q35')
                     ) {
                         return value === 'q35' ? 'pc-q35-5.1' : 'pc-i440fx-5.1';
                     }
-                    return PVE.Utils.render_qemu_machine(value);
+                    return PVE.Utils.render_qemu_machine(value, arch);
                 },
             },
             scsihw: {
@@ -419,6 +429,10 @@ Ext.define('PVE.qemu.HardwareView', {
                 pveSelNode: me.pveSelNode,
                 confid: rec.data.key,
                 url: `/api2/extjs/${baseurl}`,
+                arch: PVE.qemu.Architecture.getGuestArchitecture(
+                    me.getObjectValue('arch'),
+                    nodename,
+                ),
                 listeners: {
                     destroy: () => me.reload(),
                 },
@@ -441,6 +455,38 @@ Ext.define('PVE.qemu.HardwareView', {
             disabled: true,
             handler: run_editor,
         });
+
+        let runEfiEnroll = function () {
+            let rec = sm.getSelection()[0];
+            if (!rec) {
+                return;
+            }
+
+            let efidisk = PVE.Parser.parsePropertyString(rec.data.value, 'file');
+            efidisk['ms-cert'] = '2023k';
+
+            let params = {};
+            params[rec.data.key] = PVE.Parser.printPropertyString(efidisk);
+            Proxmox.Utils.API2Request({
+                url: `/api2/extjs/${baseurl}`,
+                waitMsgTarget: me,
+                method: 'POST',
+                params: params,
+                callback: () => me.reload(),
+                failure: (response) => Ext.Msg.alert('Error', response.htmlStatus),
+                success: function (response, options) {
+                    if (response.result.data !== null) {
+                        Ext.create('Proxmox.window.TaskProgress', {
+                            autoShow: true,
+                            upid: response.result.data,
+                            listeners: {
+                                destroy: () => me.reload(),
+                            },
+                        });
+                    }
+                },
+            });
+        };
 
         let move_menuitem = new Ext.menu.Item({
             text: gettext('Move Storage'),
@@ -510,11 +556,55 @@ Ext.define('PVE.qemu.HardwareView', {
             },
         });
 
+        const efiEnrollMsg =
+            gettext(
+                'Enroll the UEFI 2023 certificates from Microsoft required for secure boot update.',
+            ) +
+            '<br>' +
+            gettext('This is also needed for secure boot update for common Linux distributions.') +
+            '<br>' +
+            '<br>' +
+            gettext('For Windows with BitLocker, run the following command inside Powershell:') +
+            '<br><code>manage-bde -protectors -disable &lt;drive&gt;</code><br>' +
+            Ext.String.format(
+                // TRANSLATORS: for a shell command: "placeholder could be 'concrete value'"
+                gettext("For example, {0} could be '{1}'."),
+                '<code>&lt;drive&gt;</code>',
+                '<code>C:</code>',
+            ) +
+            '<br>' +
+            gettext('This is required for each drive with BitLocker before proceeding!') +
+            '<br>' +
+            gettext(
+                'Otherwise, you will be prompted for the BitLocker recovery key on the next boot!',
+            );
+        let efiEnrollMenuItem = new Ext.menu.Item({
+            text: gettext('Enroll Updated Certificates'),
+            iconCls: 'fa fa-refresh',
+            selModel: sm,
+            disabled: true,
+            hidden: true,
+            handler: () => {
+                Ext.Msg.show({
+                    title: gettext('Confirm'),
+                    icon: Ext.Msg.QUESTION,
+                    message: efiEnrollMsg,
+                    buttons: Ext.Msg.YESNO,
+                    callback: function (btn) {
+                        if (btn !== 'yes') {
+                            return;
+                        }
+                        runEfiEnroll();
+                    },
+                });
+            },
+        });
+
         let diskaction_btn = new Proxmox.button.Button({
             text: gettext('Disk Action'),
             disabled: true,
             menu: {
-                items: [move_menuitem, reassign_menuitem, resize_menuitem],
+                items: [move_menuitem, reassign_menuitem, resize_menuitem, efiEnrollMenuItem],
             },
         });
 
@@ -685,6 +775,17 @@ Ext.define('PVE.qemu.HardwareView', {
                 isUsedDisk && !isCloudInit ? remove_btn.altText : remove_btn.defaultText,
             );
             remove_btn.RESTMethod = isUnusedDisk || (isDisk && isRunning) ? 'POST' : 'PUT';
+
+            let suggestEfiEnroll = false;
+            if (isEfi) {
+                let drive = PVE.Parser.parsePropertyString(value, 'file');
+                suggestEfiEnroll =
+                    !pending &&
+                    PVE.Parser.parseBoolean(drive['pre-enrolled-keys'], false) &&
+                    drive['ms-cert'] !== '2023k';
+            }
+            efiEnrollMenuItem.setDisabled(!suggestEfiEnroll);
+            efiEnrollMenuItem.setHidden(!isEfi);
 
             edit_btn.setDisabled(
                 deleted ||
