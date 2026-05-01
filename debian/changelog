@@ -1,3 +1,20 @@
+pve-manager (8.4.19-1) bookworm; urgency=medium
+
+  * ui: prepare notice for slowly nearing Proxmox VE 8 End-of-Life after
+    August 2026.
+
+  * api: vnc/termproxy: bind VNC and SPICE tickets to the listen port to
+    harden authentication for interactive console sessions.
+
+  * api: vncproxy: always use a freshly generated password when
+    authenticating via the VNC protocol, improving entropy compared to
+    the previous ticket-derived scheme.
+
+  * api: termproxy: pin the accepted ticket in the spawned termproxy
+    process as an additional defense-in-depth measure.
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 02 May 2026 02:21:04 +0800
+
 pve-manager (8.4.16-1) bookworm; urgency=medium
 
   * api: apt changelog: make package name and option handling more robust.
@@ -5,6 +22,52 @@ pve-manager (8.4.16-1) bookworm; urgency=medium
   * pveupdate: do not try to update subscription when using offline key.
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 06 Feb 2026 15:50:25 +0800
+
+pve-manager (8.4.19) bookworm; urgency=medium
+
+  * ui: prepare notice for slowly nearing Proxmox VE 8 End-of-Life after
+    August 2026.
+
+  * api: vnc/termproxy: bind VNC and SPICE tickets to the listen port to
+    harden authentication for interactive console sessions.
+
+  * api: vncproxy: always use a freshly generated password when
+    authenticating via the VNC protocol, improving entropy compared to
+    the previous ticket-derived scheme.
+
+  * api: termproxy: pin the accepted ticket in the spawned termproxy
+    process as an additional defense-in-depth measure.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 21 Apr 2026 22:24:17 +0200
+
+pve-manager (8.4.18) bookworm; urgency=medium
+
+  * fix #6985: ui: qemu: hardware: efidisk: add 'Enroll Updated Certificates'
+    disk action for enrolling Microsoft's 2023 UEFI certificates. The original
+    set of Microsoft certificates from 2011, which Windows and common Linux
+    distributions use for secure boot, expires in June 2026. Microsoft created
+    replacement certificates in 2023.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 16 Mar 2026 12:29:33 +0100
+
+pve-manager (8.4.17) bookworm; urgency=medium
+
+  * ui: fully reset UI state on automatic logout due to stale ticket (e.g.,
+    after resuming a computer from longer suspend), as just showing the login
+    mask on top of the current state might be a bit confusing.
+
+  * ui: resource tree: fix timing race where rendered clustername in root-node
+    could seemingly vanish.
+
+  * ui: utils: fix OVMF typo in error message translation.
+
+  * ui: resource tree: don't show empty grouping nodes as expandable.
+
+  * http server: unify error message in case of auth failure.
+
+  * update shipped appliance info index.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 20 Feb 2026 09:53:29 +0100
 
 pve-manager (8.4.16) bookworm; urgency=medium
 
@@ -65,7 +128,7 @@ pve-manager (8.4.11) bookworm; urgency=medium
 
 pve-manager (8.4.10) bookworm; urgency=medium
 
-  * 合并稳定版修复补丁
+  * 合并稳定版修复补�?
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 12 Aug 2025 10:02:28 +0800
 
@@ -93,7 +156,7 @@ pve-manager (8.4.8) bookworm; urgency=medium
 
 pve-manager (8.4.7-4) bookworm; urgency=medium
 
-  * 移除订阅检测
+  * 移除订阅检�?
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 05 Aug 2025 00:33:05 +0800
 
@@ -623,12 +686,12 @@ pve-manager (8.2.5) bookworm; urgency=medium
 
 pve-manager (8.2.4-1) bookworm; urgency=medium
 
-  * 更新版本号: 扩容版本号
+  * 更新版本�?: 扩容版本�?
 
   * 更新日志：添加温度和CPU频率模块支持，依赖于apt install lm-sensors linux-cpupower -y
-  
-  * 依赖于: apt install lm-sensors linux-cpupower -y
-  
+
+  * 依赖�?: apt install lm-sensors linux-cpupower -y
+
   * 添加执行权限：chmod +s /usr/sbin/turbostat
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 06 Jul 2024 23:20:07 +0800
@@ -640,7 +703,7 @@ pve-manager (8.2.4) bookworm; urgency=medium
   * www: advanced backup: add pbs change detection mode selector
 
   * vzdump: add pbs-change-detection-mode to config template
-  
+
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Sat, 06 Jul 2024 16:33:33 +0800
 
 pve-manager (8.2.3) bookworm; urgency=medium
@@ -5339,7 +5402,7 @@ pve-manager (4.3-1) unstable; urgency=medium
 
 pve-manager (4.2-23) unstable; urgency=medium
 
-  * fix #1117: do not test for the cgmanager package in pveversion 
+  * fix #1117: do not test for the cgmanager package in pveversion
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 21 Sep 2016 16:17:22 +0200
 
@@ -5607,7 +5670,7 @@ pve-manager (4.2-7) unstable; urgency=medium
   * GUI: fix wrong message after subscription upload
 
   * GUI: fix reset button with bind mounts
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 23 May 2016 09:42:28 +0200
 
 pve-manager (4.2-6) unstable; urgency=medium
@@ -5630,7 +5693,7 @@ pve-manager (4.2-5) unstable; urgency=medium
   * Enlarge Object Grid first column default size
 
   * change hotplugselector to use checkboxes
-    
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 17 May 2016 16:59:41 +0200
 
 pve-manager (4.2-4) unstable; urgency=medium
@@ -5765,7 +5828,7 @@ pve-manager (4.1-26) unstable; urgency=medium
 pve-manager (4.1-25) unstable; urgency=medium
 
   * Build-Depend on pve-doc-generator
-  
+
   * use pve-doc-generator
 
   * various ExtJS6 GUI fixes
@@ -6184,7 +6247,7 @@ pve-manager (4.0-39) unstable; urgency=medium
   * Allow typeahead selection of Firewall macros
 
   * vzdump: replace 'find' exclude command switches
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 21 Sep 2015 12:21:51 +0200
 
 pve-manager (4.0-38) unstable; urgency=medium
@@ -6379,13 +6442,13 @@ pve-manager (4.0-17) unstable; urgency=medium
 pve-manager (4.0-16) unstable; urgency=medium
 
   *  pveversion: fix package list for pve 4.0
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 19 Jun 2015 12:25:54 +0200
 
 pve-manager (4.0-15) unstable; urgency=medium
- 
+
   * fix bug #644: remove old java console
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 19 Jun 2015 09:09:59 +0200
 
 pve-manager (4.0-14) unstable; urgency=medium
@@ -6411,7 +6474,7 @@ pve-manager (4.0-12) unstable; urgency=medium
   * change pve-manager service type to oneshot
 
   * add iothread option
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Wed, 10 Jun 2015 09:05:29 +0200
 
 pve-manager (4.0-11) unstable; urgency=medium
@@ -6471,7 +6534,7 @@ pve-manager (4.0-5) unstable; urgency=medium
   * ha GUI: show configuration errors
 
   * fix apt sources for jessie
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 07 Apr 2015 09:55:48 +0200
 
 pve-manager (4.0-4) unstable; urgency=medium
@@ -6483,9 +6546,9 @@ pve-manager (4.0-4) unstable; urgency=medium
 pve-manager (4.0-3) unstable; urgency=medium
 
   * use new pve-ha-manager
-  
+
   * remove OpenVZ related code
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 27 Mar 2015 13:42:15 +0100
 
 pve-manager (4.0-2) unstable; urgency=medium
@@ -6521,7 +6584,7 @@ pve-manager (3.3-21) unstable; urgency=low
 pve-manager (3.3-20) unstable; urgency=low
 
   * pveceph: use LWP to download release key (instead of wget)
-  
+
   * GUI: add multiqueues field to NIC form
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 13 Feb 2015 09:03:08 +0100
@@ -6534,7 +6597,7 @@ pve-manager (3.3-19) unstable; urgency=low
 
 pve-manager (3.3-18) unstable; urgency=low
 
-  * GUI: add startall/stopall/migrateall menu buttons  
+  * GUI: add startall/stopall/migrateall menu buttons
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 11 Feb 2015 09:17:50 +0100
 
@@ -6553,7 +6616,7 @@ pve-manager (3.3-16) unstable; urgency=low
 pve-manager (3.3-15) unstable; urgency=low
 
   * GUI: implement hotplug feature selector
-  
+
   * GUI: add UI for local ZFS storage
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 27 Jan 2015 12:37:36 +0100
@@ -6573,21 +6636,21 @@ pve-manager (3.3-13) unstable; urgency=low
 pve-manager (3.3-12) unstable; urgency=low
 
   * add numa option to processor form
-  
+
   * fix rendering of pending processor values
-  
+
   * GUI: dynamically update VM config every 5 seconds
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 21 Jan 2015 08:39:16 +0100
 
 pve-manager (3.3-11) unstable; urgency=low
-  
+
   * New 'disconnect' button on the network edit panel.
 
   * Fix backup failure at shutdown (stop backup on host shutdown)
-  
+
   * vzdump: new option --stop to abort running backup job
-  
+
   * Support additional e1000 variants for VM machines
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 20 Jan 2015 07:17:34 +0100
@@ -6619,9 +6682,9 @@ pve-manager (3.3-7) unstable; urgency=low
 pve-manager (3.3-6) unstable; urgency=low
 
   * VZDump: added email notification setting
-  
+
   * fix Bug #579: add START parameter in /etc/default/pve-manager
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 24 Nov 2014 06:37:36 +0100
 
 pve-manager (3.3-5) unstable; urgency=low
@@ -6663,9 +6726,9 @@ pve-manager (3.2-31) unstable; urgency=low
 pve-manager (3.2-30) unstable; urgency=low
 
   * resourcegrid : add template menu
-  
+
   * fix label width for spanish translation
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 01 Sep 2014 11:38:20 +0200
 
 pve-manager (3.2-29) unstable; urgency=low
@@ -6695,7 +6758,7 @@ pve-manager (3.2-26) unstable; urgency=low
 pve-manager (3.2-25) unstable; urgency=low
 
   * GUI: add discard option to qemu drive
-  
+
   * GUI: add Broadwell cpu model
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 20 Aug 2014 12:19:00 +0200
@@ -6703,7 +6766,7 @@ pve-manager (3.2-25) unstable; urgency=low
 pve-manager (3.2-24) unstable; urgency=low
 
   * GUI: add new 'Pool View'
-  
+
   * GUI: show correct node status in 'Storage View'
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 13 Aug 2014 08:07:59 +0200
@@ -6729,7 +6792,7 @@ pve-manager (3.2-21) unstable; urgency=low
 pve-manager (3.2-20) unstable; urgency=low
 
   * add sencha touch based GUI for mobile devices
-  
+
   * update Chinese translation (zh_CN).
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 05 Aug 2014 09:30:49 +0200
@@ -6752,7 +6815,7 @@ pve-manager (3.2-17) unstable; urgency=low
   * include improved Spanish translation
 
   * allow to set/edit two factor authentication (yubico, oath)
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Jul 2014 08:23:02 +0200
 
 pve-manager (3.2-16) unstable; urgency=low
@@ -6799,10 +6862,10 @@ pve-manager (3.2-10) unstable; urgency=low
 
 pve-manager (3.2-9) unstable; urgency=low
 
-  * kvm: add noVNC console 
-  
+  * kvm: add noVNC console
+
   * depend on pve-novnc
-  
+
   * trim subscription key to avoid unexpected errors
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 17 Jun 2014 09:10:18 +0200
@@ -6816,11 +6879,11 @@ pve-manager (3.2-8) unstable; urgency=low
 pve-manager (3.2-7) unstable; urgency=low
 
   * add Firewall GUI
-  
+
   * openvz: add bridge vlan && firewall options to gui
 
   * depend on pve-firewall
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 03 Jun 2014 09:07:50 +0200
 
 pve-manager (3.2-6) unstable; urgency=low
@@ -6834,7 +6897,7 @@ pve-manager (3.2-5) unstable; urgency=low
   * produce nicer html for direct API access (/api2/html)
 
   * always delay unauthorized calls
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 02 May 2014 12:01:23 +0200
 
 pve-manager (3.2-4) unstable; urgency=low
@@ -6852,9 +6915,9 @@ pve-manager (3.2-3) unstable; urgency=low
 pve-manager (3.2-2) unstable; urgency=low
 
   * pveceph: fix purge command
-  
+
   * pheceph: add -version argument to install (defaults to dumpling)
-  
+
   * spice-example-sh: avoid use of sed and aw
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 01 Apr 2014 06:04:04 +0200
@@ -6868,7 +6931,7 @@ pve-manager (3.2-1) unstable; urgency=low
 pve-manager (3.1-45) unstable; urgency=low
 
   * parseQemuNetwork: add vmxnet3
-  
+
   * add /usr/share/doc/pve-manager/examples/spice-example-sh
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 03 Mar 2014 07:06:02 +0100
@@ -6908,17 +6971,17 @@ pve-manager (3.1-40) unstable; urgency=low
 pve-manager (3.1-39) unstable; urgency=low
 
   * ceph: view osd commit/apply latency
-  
+
   * ceph: display osd usage
 
   * ceph: display pool usage information
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 23 Jan 2014 10:22:20 +0100
 
 pve-manager (3.1-38) unstable; urgency=low
 
   * ceph: add API and buttons for osd in/out
-  
+
   * use longer rados timeouts when inside worker tasks
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 22 Jan 2014 12:49:46 +0100
@@ -6932,23 +6995,23 @@ pve-manager (3.1-37) unstable; urgency=low
 pve-manager (3.1-36) unstable; urgency=low
 
   * use PVE::RADOS perl bindings
-  
-  * set spiceterm timeout to 40 
+
+  * set spiceterm timeout to 40
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 20 Jan 2014 08:57:42 +0100
 
 pve-manager (3.1-35) unstable; urgency=low
 
   * update max cores limit to 128
-  
+
   * use separate window for disk IO-throttle form
 
   * ceph: improve disk usage detection
-  
+
   * ceph: allow to specify separate journal disks
-  
+
   * depend on gdisk
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 14 Jan 2014 11:43:54 +0100
 
 pve-manager (3.1-34) unstable; urgency=low
@@ -6960,11 +7023,11 @@ pve-manager (3.1-34) unstable; urgency=low
 pve-manager (3.1-33) unstable; urgency=low
 
   * ceph: return decompiled crush map in text format
-  
+
   * ceph: try to unmount OSD after removal
-  
+
   * ceph: only use 64 PGs by default
-  
+
   * ceph: allow to specify crush ruleset on pool creation
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 03 Jan 2014 10:58:49 +0100
@@ -6972,13 +7035,13 @@ pve-manager (3.1-33) unstable; urgency=low
 pve-manager (3.1-32) unstable; urgency=low
 
   * add mtu support for manual interfaces
-  
+
   * pveceph: allow to set min_size for pools, fix osd remove
 
   * improve OVS GUI
-  
+
   * add support to change bond_xmit_hash_policy on linux bond devices
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 31 Dec 2013 10:17:52 +0100
 
 pve-manager (3.1-31) unstable; urgency=low
@@ -7008,9 +7071,9 @@ pve-manager (3.1-28) unstable; urgency=low
 pve-manager (3.1-27) unstable; urgency=low
 
   * API: remove spiceconfig format
-  
+
   * GUI: allow to open SPICE console with command menu
-  
+
   * set correct locale environment when running spiceterm
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 11 Dec 2013 11:52:17 +0100
@@ -7018,11 +7081,11 @@ pve-manager (3.1-27) unstable; urgency=low
 pve-manager (3.1-26) unstable; urgency=low
 
   * add new console option to datacenter.cfg (java applet vs. spice)
-  
+
   * new execute API (execute multiple commands with one request)
-  
+
   * depend on spiceterm
-  
+
   * better GUI for console (use a splitbutton)
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 10 Dec 2013 12:07:05 +0100
@@ -7030,9 +7093,9 @@ pve-manager (3.1-26) unstable; urgency=low
 pve-manager (3.1-25) unstable; urgency=low
 
   * delay UNAUTHORIZED response to avoid DOS attac
-  
+
   * fix typo in pve cron script
-  
+
   * backup GUI: fix VMID selection bug
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 18 Nov 2013 11:20:37 +0100
@@ -7040,7 +7103,7 @@ pve-manager (3.1-25) unstable; urgency=low
 pve-manager (3.1-24) unstable; urgency=low
 
   * fix IP address parser for OpenVZ containers
-  
+
   * fix UPID parser for long uptimes (> 497 days)
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 06 Nov 2013 10:48:19 +0100
@@ -7048,9 +7111,9 @@ pve-manager (3.1-24) unstable; urgency=low
 pve-manager (3.1-23) unstable; urgency=low
 
   * subscription updates: set UserAgent header on proxy connect request
-  
+
   * correctly set content type for GUI index page
-  
+
   * allow to add ipv6 address to OpenVZ containers
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 29 Oct 2013 10:20:02 +0100
@@ -7070,18 +7133,18 @@ pve-manager (3.1-21) unstable; urgency=low
 pve-manager (3.1-20) unstable; urgency=low
 
   * some GUI optimizations for slow connections
-  
+
   * remove nexenta plugin
-  
+
   * ZFS GUI rework
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 14 Oct 2013 07:46:59 +0200
 
 pve-manager (3.1-19) unstable; urgency=low
 
-  * vzdump: remove temporary directories (revert bug introduced by 
+  * vzdump: remove temporary directories (revert bug introduced by
     commit 1bb6e88fd65bb44a745065d2d899832f6ea0a2f5)
-  
+
   * add Editor for new ZFSPlugin
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 04 Oct 2013 06:55:58 +0200
@@ -7094,7 +7157,7 @@ pve-manager (3.1-18) unstable; urgency=low
 
 pve-manager (3.1-17) unstable; urgency=low
 
-  * openvz create/restore: use new PVE::Storage::abs_filesystem_path() in 
+  * openvz create/restore: use new PVE::Storage::abs_filesystem_path() in
     order to correctly activate the storage.
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 01 Oct 2013 12:47:22 +0200
@@ -7102,7 +7165,7 @@ pve-manager (3.1-17) unstable; urgency=low
 pve-manager (3.1-16) unstable; urgency=low
 
   * do not use -w switch as it breaks modules
-  
+
   * pveproxy: fix configuration parser for /dec/defaults/pveproxy
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 01 Oct 2013 10:37:39 +0200
@@ -7153,7 +7216,7 @@ pve-manager (3.1-9) unstable; urgency=low
 pve-manager (3.1-8) unstable; urgency=low
 
   * fix https proxy calls (always use CONNECT)
-  
+
   * use correct changelog URLs for pve repositories
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 09 Sep 2013 11:39:49 +0200
@@ -7161,7 +7224,7 @@ pve-manager (3.1-8) unstable; urgency=low
 pve-manager (3.1-7) unstable; urgency=low
 
   * vzdump: correctly handle maxfiles parameter (0 is unlimited)
-  
+
   * improve API2Client.pm code
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 05 Sep 2013 11:00:46 +0200
@@ -7169,7 +7232,7 @@ pve-manager (3.1-7) unstable; urgency=low
 pve-manager (3.1-6) unstable; urgency=low
 
   * update German translation
-  
+
   * update Chinese translation
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 03 Sep 2013 07:03:02 +0200
@@ -7195,7 +7258,7 @@ pve-manager (3.1-3) unstable; urgency=low
 pve-manager (3.1-2) unstable; urgency=low
 
   * fix perl dependencies
-  
+
   * display subscription status after login
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 16 Aug 2013 06:15:27 +0200
@@ -7209,7 +7272,7 @@ pve-manager (3.1-1) unstable; urgency=low
 pve-manager (3.0-38) unstable; urgency=low
 
   * add GUI for GlusterFS storage
-  
+
   * vzdump: wait one second before unmounting the snapshot (avoid device busy error)
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 13 Aug 2013 10:32:05 +0200
@@ -7217,17 +7280,17 @@ pve-manager (3.0-38) unstable; urgency=low
 pve-manager (3.0-37) unstable; urgency=low
 
   * apt: try to detect new packages
-  
+
   * tell apt to use http_proxy settings
-  
+
   * support to view changelogs for available pve packages
-  
+
   * allow to configure cipher list for pveproxy
-  
+
   * automatically add pve repository to apt sources list
-  
+
   * allow to use serial terminal as display
-  
+
   * avoid apt autoremoval for pve-kernel packages
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 02 Aug 2013 10:11:33 +0200
@@ -7235,9 +7298,9 @@ pve-manager (3.0-37) unstable; urgency=low
 pve-manager (3.0-36) unstable; urgency=low
 
   * fix proxy loop assertion for spiceproxy
-  
+
   * pveproxy: use same cipher list as debian apache ssl.conf
-  
+
   * avoid apt autoremoval for pve-kernel packages
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 24 Jul 2013 12:43:38 +0200
@@ -7257,7 +7320,7 @@ pve-manager (3.0-34) unstable; urgency=low
 pve-manager (3.0-33) unstable; urgency=low
 
   * correctly initialize $rpcenv in spiceproxy
-  
+
   * fix bug #437: include pve-libspice-server1 in package list
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 19 Jul 2013 11:41:00 +0200
@@ -7273,7 +7336,7 @@ pve-manager (3.0-31) unstable; urgency=low
   * add button to start SPICE console
 
   * add spiceproxy server
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Wed, 26 Jun 2013 13:40:55 +0200
 
 pve-manager (3.0-30) unstable; urgency=low
@@ -7287,20 +7350,20 @@ pve-manager (3.0-29) unstable; urgency=low
   * new pveupgrade script, used to display additional information to the
     user (reboot required? database up to date? ...)
 
-  * add button to display package versions, to provide same info as 
+  * add button to display package versions, to provide same info as
     'pveversion -v' on GUI.
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 21 Jun 2013 12:07:44 +0200
 
 pve-manager (3.0-28) unstable; urgency=low
 
   * fix bug #408: reset ENV before starting shell
-  
+
   * fix bug #379: allow to overwrite existing CTs if user has VM.Backup
     permissions
-  
+
   * Allow to send notification mail about new packages.
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 20 Jun 2013 11:12:50 +0200
 
 pve-manager (3.0-27) unstable; urgency=low
@@ -7325,9 +7388,9 @@ pve-manager (3.0-25) unstable; urgency=low
 pve-manager (3.0-24) unstable; urgency=low
 
   * update Norwegian translations
-  
+
   * rrd display : avoid 2 refresh
-  
+
   * avoid gzip http response for png & gif & jar
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 12 Jun 2013 07:24:54 +0200
@@ -7335,11 +7398,11 @@ pve-manager (3.0-24) unstable; urgency=low
 pve-manager (3.0-23) unstable; urgency=low
 
   * fix bug #368: use vtype 'DnsName' to verify host names
-  
+
   * fix bug #401: disable connection timeout during API call processing
 
   * add support for new qemu-server async configuration API
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 07 Jun 2013 11:52:15 +0200
 
 pve-manager (3.0-22) unstable; urgency=low
@@ -7363,9 +7426,9 @@ pve-manager (3.0-20) unstable; urgency=low
 pve-manager (3.0-19) unstable; urgency=low
 
   * updated Chinese translation
-  
+
   * allow to upload files with spaces in filename (replace with '_')
-  
+
   * allow to delete pools with non-existent VMs/Storage
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 22 May 2013 06:04:49 +0200
@@ -7373,13 +7436,13 @@ pve-manager (3.0-19) unstable; urgency=low
 pve-manager (3.0-18) unstable; urgency=low
 
   * use correct icons for templates
-  
+
   * sort templates after regular VMs
-  
+
   * update German translation
 
   * update French translation
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 21 May 2013 10:58:47 +0200
 
 pve-manager (3.0-17) unstable; urgency=low
@@ -7427,9 +7490,9 @@ pve-manager (3.0-11) unstable; urgency=low
 pve-manager (3.0-10) unstable; urgency=low
 
   * pveproxy: implement if-modified-since
-  
+
   * pveproxy: implement host based access control
-  
+
   * implement node netstat call to get current tap network counters
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 24 Apr 2013 08:05:11 +0200
@@ -7437,9 +7500,9 @@ pve-manager (3.0-10) unstable; urgency=low
 pve-manager (3.0-9) unstable; urgency=low
 
   * http: improve security by setting size limits
-  
+
   * stop keep-alive when there are many open connections
-  
+
   * improve syslog for file uploads
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 16 Apr 2013 11:56:00 +0200
@@ -7447,7 +7510,7 @@ pve-manager (3.0-9) unstable; urgency=low
 pve-manager (3.0-8) unstable; urgency=low
 
   * disable Nagle algorithm to maximitze performance
-  
+
   * fix multipart parser
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 16 Apr 2013 07:43:56 +0200
@@ -7528,9 +7591,9 @@ pve-manager (2.3-9) unstable; urgency=low
 pve-manager (2.3-8) unstable; urgency=low
 
   * Allow to set tablet option on the GUI
-  
+
   * use qcow2 format as default for directory and NFS storage
-  
+
   * cleanup RDB GUI (remove authsupported)
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 18 Feb 2013 13:39:47 +0100
@@ -7538,11 +7601,11 @@ pve-manager (2.3-8) unstable; urgency=low
 pve-manager (2.3-7) unstable; urgency=low
 
   * fix javascript jslint warnings to make it work on all browsers.
-  
+
   * use e1000 as default network card
-  
+
   * enable RBD on the GUI
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jan 2013 07:16:13 +0100
 
 pve-manager (2.3-6) unstable; urgency=low
@@ -7566,7 +7629,7 @@ pve-manager (2.3-4) unstable; urgency=low
 pve-manager (2.3-3) unstable; urgency=low
 
   * GUI: tasks - use better icon for open console
-  
+
   * implement auto-ballooning
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 20 Dec 2012 13:44:53 +0100
@@ -7586,7 +7649,7 @@ pve-manager (2.3-1) unstable; urgency=low
 pve-manager (2.2-32) unstable; urgency=low
 
   * add new cpu types:  Haswell and Opteron_G5
-  
+
   * remove rhel specific cpu types: cpu64-rhel6 and cpu64-rhel5
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 27 Nov 2012 06:46:35 +0100
@@ -7600,7 +7663,7 @@ pve-manager (2.2-31) unstable; urgency=low
 pve-manager (2.2-30) unstable; urgency=low
 
   * add Norwegian (Bokmal and Nynorsk) translations.
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 15 Nov 2012 07:31:30 +0100
 
 pve-manager (2.2-29) unstable; urgency=low
@@ -7612,12 +7675,12 @@ pve-manager (2.2-29) unstable; urgency=low
 pve-manager (2.2-28) unstable; urgency=low
 
   * remove hardcoded blowfish cipher
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Wed, 31 Oct 2012 14:01:54 +0100
 
 pve-manager (2.2-27) unstable; urgency=low
 
-  * fix RRD images caching problems: new create_rrd_graph returns rrd 
+  * fix RRD images caching problems: new create_rrd_graph returns rrd
   png data inline - no need to read data from file.
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 31 Oct 2012 07:15:57 +0100
@@ -7649,11 +7712,11 @@ pve-manager (2.2-23) unstable; urgency=low
 pve-manager (2.2-22) unstable; urgency=low
 
   * vzdump: also run 'backup-start' hook in snapshot mode
-  
+
   * update openvz appliance list
-  
+
   * add win8 to OS type selector
-  
+
   * fix bug #205
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 12 Oct 2012 06:07:12 +0200
@@ -7667,11 +7730,11 @@ pve-manager (2.2-21) unstable; urgency=low
 pve-manager (2.2-20) unstable; urgency=low
 
   * openvz: use real console instead of 'vzctl enter'
-  
+
   * openvz: remove init-logger pagers
-  
+
   * dpenend on dtach (used by openvz console)
-  
+
   * pvestatd: remove stale 'vzctl console' processes
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 02 Oct 2012 06:49:12 +0200
@@ -7697,9 +7760,9 @@ pve-manager (2.2-17) unstable; urgency=low
 pve-manager (2.1-16) unstable; urgency=low
 
   * vzrestore: allow --storage option
-  
+
   * fix bug 178: correctly verify if VMID is already used
-  
+
   * GUI: allow to select SCSI disks when creating VMs (booting from SCSI
     disks works again)
 
@@ -7708,11 +7771,11 @@ pve-manager (2.1-16) unstable; urgency=low
 pve-manager (2.1-15) unstable; urgency=low
 
   * Slovenian translation (thanks to Dojan Borstnar)
-  
+
   * new option to select SCSI controller hardware
-  
+
   * add SATA to GUI
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Wed, 29 Aug 2012 07:15:54 +0200
 
 pve-manager (2.1-14) unstable; urgency=low
@@ -7790,7 +7853,7 @@ pve-manager (2.1-3) unstable; urgency=low
 pve-manager (2.1-2) unstable; urgency=low
 
   * set apache directory access options for all used dirs
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 30 Apr 2012 11:00:49 +0200
 
 pve-manager (2.1-1) unstable; urgency=low
@@ -7803,9 +7866,9 @@ pve-manager (2.0-64) unstable; urgency=low
 
   * fix bug #179: set default button 'no' for dangerous actions, use
   warning icon for such actions
-  
+
   * fix bug #177: allow memory up to 512GB
-  
+
   * fix bug #174: add cpuunits to KVM options
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 24 Apr 2012 08:09:23 +0200
@@ -7813,7 +7876,7 @@ pve-manager (2.0-64) unstable; urgency=low
 pve-manager (2.0-63) unstable; urgency=low
 
   * fix bug 128: implement pvectl startall/stopall
-  
+
   * fix bug 171: activate storage before starting containers
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 18 Apr 2012 10:02:54 +0200
@@ -7821,7 +7884,7 @@ pve-manager (2.0-63) unstable; urgency=low
 pve-manager (2.0-62) unstable; urgency=low
 
   * fix bug #115: simplify GUI for users without permissions.
-  
+
   * update Italian translation
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 17 Apr 2012 10:37:05 +0200
@@ -7841,9 +7904,9 @@ pve-manager (2.0-59) unstable; urgency=low
 pve-manager (2.0-58) unstable; urgency=low
 
   * fix bug #141: allow to create backup job without compression
-  
+
   * expose directsync drive cache option
-  
+
   * add Turkish keyboard layout
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 11 Apr 2012 08:38:59 +0200
@@ -7864,7 +7927,7 @@ pve-manager (2.0-55) unstable; urgency=low
 
   * fix bug #135: allow single letter 'dns-name', allow to start names
     with numbers
-  
+
   * fix bug #137: API change! Return node name using 'node' property.
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 02 Apr 2012 12:13:33 +0200
@@ -7872,7 +7935,7 @@ pve-manager (2.0-55) unstable; urgency=low
 pve-manager (2.0-54) unstable; urgency=low
 
   * use /etc/subscription to store subscription key
-  
+
   * use http_proxy settings for subscription updates
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 29 Mar 2012 11:13:35 +0200
@@ -7911,7 +7974,7 @@ pve-manager (2.0-49) unstable; urgency=low
 pve-manager (2.0-48) unstable; urgency=low
 
   * fix bug #97: execute 'clusvcadm' commands for HA managed CTs
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 27 Mar 2012 10:59:33 +0200
 
 pve-manager (2.0-47) unstable; urgency=low
@@ -7929,7 +7992,7 @@ pve-manager (2.0-46) unstable; urgency=low
 pve-manager (2.0-45) unstable; urgency=low
 
   * fix bug 124: correctly return maxfiles flag
-  
+
   * vzdump: use storage 'local' as default backup target (instead of using
     Openvz dump directory settings)
 
@@ -7938,7 +8001,7 @@ pve-manager (2.0-45) unstable; urgency=low
 pve-manager (2.0-44) unstable; urgency=low
 
   * Disable automatic file removal on 'Backup now'
-  
+
   * Option 'maxfiles' is now a storage option (to specify the maximal
     number of allowed backups per VM)
 
@@ -7971,8 +8034,8 @@ pve-manager (2.0-40) unstable; urgency=low
 pve-manager (2.0-39) unstable; urgency=low
 
   * add Spanish translation
-  
-  * Do not allow to select SCSI inside the VM creation wizard, 
+
+  * Do not allow to select SCSI inside the VM creation wizard,
   because booting from SCSI does not work with current kvm version
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 02 Mar 2012 10:49:12 +0100
@@ -8016,9 +8079,9 @@ pve-manager (2.0-33) unstable; urgency=low
 pve-manager (2.0-32) unstable; urgency=low
 
   * added French translation
-  
+
   * expose all ne CPU models on the GUI
-  
+
   * skip fuzzy translations (avoid wrong translation on GUI)
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 22 Feb 2012 07:23:21 +0100
@@ -8026,7 +8089,7 @@ pve-manager (2.0-32) unstable; urgency=low
 pve-manager (2.0-31) unstable; urgency=low
 
   * add template download GUI
-  
+
   * include turnkey appliances in download list.
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 21 Feb 2012 11:45:07 +0100
@@ -8040,7 +8103,7 @@ pve-manager (2.0-30) unstable; urgency=low
 pve-manager (2.0-29) unstable; urgency=low
 
   * fix datacenter options GUI
-  
+
   * fix German translation
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 20 Feb 2012 06:52:32 +0100
@@ -8084,7 +8147,7 @@ pve-manager (2.0-23) unstable; urgency=low
 pve-manager (2.0-22) unstable; urgency=low
 
   * fix lint errors
-  
+
   * fix compression selector
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 10 Feb 2012 12:26:39 +0100
@@ -8098,25 +8161,25 @@ pve-manager (2.0-21) unstable; urgency=low
 pve-manager (2.0-20) unstable; urgency=low
 
   * improve user management
-  
+
   * implement permission checks
-  
+
   * improve backup GUI (allow to select lzo/gzip)
 
   * add pools to resource list
-  
+
   * fix bug #85: allow root@pam to generate tickets for other users
 
   * fix bug #86: correctly decode cookie
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Tue, 17 Jan 2012 06:36:23 +0100
 
 pve-manager (2.0-19) unstable; urgency=low
 
   * depend on resource-agents-pve
-  
+
   * depend on fence-agents-pve
-  
+
   * fix Danish kvm keyboard name (use 'da' instead of 'dk')
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 09 Jan 2012 10:13:00 +0100
@@ -8124,7 +8187,7 @@ pve-manager (2.0-19) unstable; urgency=low
 pve-manager (2.0-18) unstable; urgency=low
 
   * add Datacenter summary
-  
+
   * use NFS version 3 by default when creating a new NFS storage.
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 23 Dec 2011 10:39:34 +0100
@@ -8138,7 +8201,7 @@ pve-manager (2.0-17) unstable; urgency=low
 pve-manager (2.0-16) unstable; urgency=low
 
   * improve OpenVZ API (impl. shutdown)
-  
+
   * improve HA resource agent
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 15 Dec 2011 13:48:39 +0100
@@ -8188,7 +8251,7 @@ pve-manager (2.0-9) unstable; urgency=low
 pve-manager (2.0-8) unstable; urgency=low
 
   * implement vzdump and backup/restore GUI
-  
+
   * implement qemu monitor
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 09 Nov 2011 09:58:56 +0100
@@ -8202,7 +8265,7 @@ pve-manager (2.0-7) unstable; urgency=low
 pve-manager (2.0-6) unstable; urgency=low
 
   * implemented openvz vnc console
-  
+
   * fix bug #4, #5, #6 and #8
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 05 Oct 2011 10:52:53 +0200
@@ -8210,7 +8273,7 @@ pve-manager (2.0-6) unstable; urgency=low
 pve-manager (2.0-5) unstable; urgency=low
 
   * implemented openvz create wizard
-  
+
   * avoid error in dpkg triggers
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 04 Oct 2011 07:03:50 +0200
@@ -8230,7 +8293,7 @@ pve-manager (2.0-3) unstable; urgency=low
 pve-manager (2.0-2) unstable; urgency=low
 
   * fix console size
-  
+
   * fix dns network editor
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 27 Jun 2011 12:39:18 +0200
@@ -8246,7 +8309,7 @@ pve-manager (1.5-7) unstable; urgency=low
   * correctly display cpu usage and avoid warning about undefined values.
 
   * display 'used' bytes in storage browser.
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 11 Feb 2010 10:30:14 +0100
 
 pve-manager (1.5-6) unstable; urgency=low
@@ -8284,11 +8347,11 @@ pve-manager (1.5-2) unstable; urgency=low
 pve-manager (1.5-1) unstable; urgency=low
 
   * updated vietnamese translations
-  
+
   * show all bridges (0-999) when creating KVM VMs
 
   * show all installed pve kernels with pveversion
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Dec 2009 09:52:36 +0100
 
 pve-manager (1.4-10) unstable; urgency=low
@@ -8306,7 +8369,7 @@ pve-manager (1.4-9) unstable; urgency=low
 pve-manager (1.4-8) unstable; urgency=low
 
   * updated italian translation
-  
+
   * list backup files on web interface
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 08 Oct 2009 13:36:52 +0200
@@ -8314,7 +8377,7 @@ pve-manager (1.4-8) unstable; urgency=low
 pve-manager (1.4-7) unstable; urgency=low
 
   * separate page/memu for ISO uploads (for new storage model)
-  
+
   * fix pveversion bug
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 07 Oct 2009 13:10:30 +0200
@@ -8327,25 +8390,25 @@ pve-manager (1.4-6) unstable; urgency=low
 
 pve-manager (1.4-5) unstable; urgency=low
 
-  * updated Vietnamese translations 
-  
+  * updated Vietnamese translations
+
   * support up to 1000 bridges
-  
+
   *  avoid excessive logs in pevtunnel
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Sep 2009 10:34:31 +0200
 
 pve-manager (1.4-4) unstable; urgency=low
 
-  * updated Vietnamese translations 
+  * updated Vietnamese translations
 
-  * fix SOAP serializer bug 
-  
+  * fix SOAP serializer bug
+
  -- Proxmox Support Team <support@proxmox.com>  Thu, 17 Sep 2009 13:07:39 +0200
 
 pve-manager (1.4-3) unstable; urgency=low
 
-  * added Vietnamese and Polish translations 
+  * added Vietnamese and Polish translations
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Sep 2009 11:05:31 +0200
 
@@ -8358,11 +8421,11 @@ pve-manager (1.4-2) unstable; urgency=low
 pve-manager (1.4-1) unstable; urgency=low
 
   * use new storage manager framework
-  
+
   * implemented SOAP authentication framework (use tickets)
 
   * depend on libterm-readline-gnu-perl
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Fri, 03 Jul 2009 14:44:30 +0200
 
 pve-manager (1.3-1) unstable; urgency=low
@@ -8380,16 +8443,16 @@ pve-manager (1.2-2) unstable; urgency=low
 pve-manager (1.2-1) unstable; urgency=low
 
   * prepare for debian lenny
-  
+
   * move /var/www/* to /usr/share/pve-manager/*
-  
+
   * use externale libjs-prototype library
-  
+
   * remove NoCachePNG.pm (we do not use it)
-  
+
   * use 'configure' instead of hardcoded paths in makefile
-  
-  * pve.conf.in - substitute paths with configure 
+
+  * pve.conf.in - substitute paths with configure
 
  -- Proxmox Support Team <support@proxmox.com>  Fri, 24 Apr 2009 08:07:53 +0200
 
@@ -8410,9 +8473,9 @@ pve-manager (1.1-1) unstable; urgency=low
   * do not start container when setting passwords
 
   *  Avoids ghost tasks when PIDs are recycled
-  
+
   * logfile viewer: filter some terminal escape codes
-  
+
  -- Proxmox Support Team <support@proxmox.com>  Mon, 12 Jan 2009 13:03:17 +0100
 
 pve-manager (1.0-11) unstable; urgency=low
@@ -8430,7 +8493,7 @@ pve-manager (1.0-10) unstable; urgency=low
 pve-manager (1.0-9) unstable; urgency=low
 
   * fix shell metacharacter problem
-  
+
   * new vznetaddbr script
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 19 Nov 2008 12:53:18 +0100

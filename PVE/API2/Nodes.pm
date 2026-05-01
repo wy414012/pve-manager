@@ -5,6 +5,7 @@ use warnings;
 
 use Digest::MD5;
 use Digest::SHA;
+use Fcntl qw(F_GETFD F_SETFD FD_CLOEXEC);
 use Filesys::Df;
 use HTTP::Status qw(:constants);
 use JSON;
@@ -36,6 +37,7 @@ use PVE::RRD;
 use PVE::Report;
 use PVE::SafeSyslog;
 use PVE::Storage;
+use PVE::Ticket;
 use PVE::Tools qw(file_get_contents);
 use PVE::pvecfg;
 
@@ -1104,7 +1106,9 @@ my $shell_cmd_map = {
 };
 
 sub get_shell_command {
-    my ($user, $shellcmd, $args) = @_;
+    my ($user, $shellcmd, $args, $tunnel_cmd) = @_;
+
+    my $is_ssh_tunneling = defined($tunnel_cmd) && scalar(@$tunnel_cmd);
 
     my $cmd;
     if ($user eq 'root@pam') {
@@ -1121,7 +1125,8 @@ sub get_shell_command {
         # non-root must always login for now, we do not have a superuser role!
         $cmd = ['/bin/login'];
     }
-    return $cmd;
+
+    return $is_ssh_tunneling ? [$tunnel_cmd->@*, $cmd->@*] : $cmd;
 }
 
 my $get_vnc_connection_info = sub {
@@ -1198,6 +1203,12 @@ __PACKAGE__->register_method({
         properties => {
             user => { type => 'string' },
             ticket => { type => 'string' },
+            password => {
+                optional => 1,
+                description => "Password used for authentication within the VNC protocol."
+                    . " Consists of printable ASCII characters ('!' .. '~').",
+                type => 'string',
+            },
             cert => { type => 'string' },
             port => { type => 'integer' },
             upid => { type => 'string' },
@@ -1216,14 +1227,15 @@ __PACKAGE__->register_method({
         my $node = $param->{node};
 
         my $authpath = "/nodes/$node";
-        my $ticket = PVE::AccessControl::assemble_vnc_ticket($user, $authpath);
 
         $sslcert = PVE::Tools::file_get_contents("/etc/pve/pve-root-ca.pem", 8192)
             if !$sslcert;
 
-        my ($port, $remcmd) = $get_vnc_connection_info->($node);
+        my ($port, $tunnel_cmd) = $get_vnc_connection_info->($node);
 
-        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'});
+        my $ticket = PVE::AccessControl::assemble_vnc_ticket($user, $authpath, $port);
+
+        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'}, $tunnel_cmd);
 
         my $timeout = 10;
 
@@ -1237,17 +1249,25 @@ __PACKAGE__->register_method({
             $authpath,
             '-perm',
             'Sys.Console',
+            '-verify-port',
         ];
 
         push @$cmd, '-width', $param->{width} if $param->{width};
         push @$cmd, '-height', $param->{height} if $param->{height};
 
+        my $password;
         if ($param->{websocket}) {
-            $ENV{PVE_VNC_TICKET} = $ticket; # pass ticket to vncterm
+            $password = PVE::Ticket::generate_vnc_password();
+            # FIXME: MAJOR VERSION: Avoid this hack, require using explicit 'password' return value
+            $ticket = "${password}:${ticket}";
+            $ENV{PVE_VNC_TICKET} = $password; # pass VNC protocol password to vncterm
             push @$cmd, '-notls', '-listen', 'localhost';
+        } else {
+            # else authentication happens via ticket only, not via password in VNC protocol
+            $ENV{PVE_VNC_TICKET} = $ticket; # pass VNC ticket to vncterm
         }
 
-        push @$cmd, '-c', @$remcmd, @$shcmd;
+        push @$cmd, '-c', @$shcmd;
 
         my $realcmd = sub {
             my $upid = shift;
@@ -1284,13 +1304,17 @@ __PACKAGE__->register_method({
 
         PVE::Tools::wait_for_vnc_port($port);
 
-        return {
+        my $res = {
             user => $user,
             ticket => $ticket,
             port => $port,
             upid => $upid,
             cert => $sslcert,
         };
+
+        $res->{password} = $password if defined($password);
+
+        return $res;
     },
 });
 
@@ -1342,23 +1366,45 @@ __PACKAGE__->register_method({
 
         my $node = $param->{node};
         my $authpath = "/nodes/$node";
-        my $ticket = PVE::AccessControl::assemble_vnc_ticket($user, $authpath);
 
-        my ($port, $remcmd) = $get_vnc_connection_info->($node);
+        my ($port, $tunnel_cmd) = $get_vnc_connection_info->($node);
+        my $ticket = PVE::AccessControl::assemble_vnc_ticket($user, $authpath, $port);
 
-        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'});
+        my $shcmd = get_shell_command($user, $param->{cmd}, $param->{'cmd-opts'}, $tunnel_cmd);
 
         my $realcmd = sub {
             my $upid = shift;
 
             syslog('info', "starting termproxy $upid\n");
 
-            my $cmd = [
-                '/usr/bin/termproxy', $port, '--path', $authpath, '--perm', 'Sys.Console', '--',
-            ];
-            push @$cmd, @$remcmd, @$shcmd;
+            pipe(my $ticket_rd, my $ticket_wr) or die "failed to create pipe: $!\n";
 
-            PVE::Tools::run_command($cmd);
+            my $flags = fcntl($ticket_rd, F_GETFD, 0)
+                // die "failed to get file descriptor flags: $!\n";
+            fcntl($ticket_rd, F_SETFD, $flags & ~FD_CLOEXEC)
+                // die "failed to remove CLOEXEC flag from fd: $!\n";
+
+            my $cmd = [
+                '/usr/bin/termproxy',
+                $port,
+                '--path',
+                $authpath,
+                '--perm',
+                'Sys.Console',
+                '--vncticket-endpoint',
+                '--verify-port',
+                '--ticket-fd',
+                fileno($ticket_rd),
+                '--',
+            ];
+            push @$cmd, @$shcmd;
+
+            my $afterfork = sub {
+                print {$ticket_wr} $ticket;
+                close($ticket_wr);
+            };
+
+            PVE::Tools::run_command($cmd, afterfork => $afterfork);
         };
         my $upid = $rpcenv->fork_worker('vncshell', "", $user, $realcmd);
 
@@ -1387,12 +1433,12 @@ __PACKAGE__->register_method({
         properties => {
             node => get_standard_option('pve-node'),
             vncticket => {
-                description => "Ticket from previous call to vncproxy.",
+                description => "Ticket from previous call to 'vncshell'.",
                 type => 'string',
                 maxLength => 512,
             },
             port => {
-                description => "Port number returned by previous vncproxy call.",
+                description => "Port number returned by previous 'vncshell' call.",
                 type => 'integer',
                 minimum => 5900,
                 maximum => 5999,
@@ -1414,9 +1460,9 @@ __PACKAGE__->register_method({
 
         my $authpath = "/nodes/$param->{node}";
 
-        PVE::AccessControl::verify_vnc_ticket($param->{vncticket}, $user, $authpath);
-
         my $port = $param->{port};
+
+        PVE::AccessControl::verify_vnc_ticket($param->{vncticket}, $user, $authpath, $port);
 
         return { port => $port };
     },
