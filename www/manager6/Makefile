@@ -61,11 +61,13 @@ JSSRC= 							\
 	form/PCISelector.js				\
 	form/PCIMapSelector.js				\
 	form/PermPathSelector.js			\
+	form/PhysBitsSelector.js			\
 	form/PoolSelector.js				\
 	form/PreallocationSelector.js			\
 	form/PrivilegesSelector.js			\
 	form/QemuBiosSelector.js			\
 	form/QemuMachineSelector.js			\
+	form/RecordSearchField.js			\
 	form/SDNControllerSelector.js			\
 	form/SDNZoneSelector.js				\
 	form/SDNVnetSelector.js				\
@@ -149,6 +151,7 @@ JSSRC= 							\
 	window/DirMapEdit.js				\
 	window/GuestImport.js				\
 	ha/Fencing.js					\
+	ha/NodePrioritySelector.js			\
 	ha/ResourceEdit.js				\
 	ha/Resources.js					\
 	ha/RuleEdit.js					\
@@ -174,6 +177,8 @@ JSSRC= 							\
 	dc/CmdMenu.js					\
 	dc/Config.js					\
 	dc/CorosyncLinkEdit.js				\
+	dc/CPUTypeEdit.js				\
+	dc/CPUTypeView.js				\
 	dc/GroupEdit.js					\
 	dc/GroupView.js					\
 	dc/Guests.js					\
@@ -210,6 +215,7 @@ JSSRC= 							\
 	lxc/DNS.js					\
 	lxc/FeaturesEdit.js				\
 	lxc/EnvEdit.js				\
+	lxc/IdMapField.js				\
 	lxc/MPEdit.js					\
 	lxc/MPResize.js					\
 	lxc/Network.js					\
@@ -309,6 +315,10 @@ JSSRC= 							\
 	sdn/ZoneView.js					\
 	sdn/IpamEdit.js					\
 	sdn/OptionsPanel.js				\
+	sdn/RouteMapPanel.js				\
+	sdn/RouteMapSelector.js				\
+	sdn/PrefixListPanel.js				\
+	sdn/PrefixListSelector.js				\
 	sdn/controllers/Base.js				\
 	sdn/controllers/EvpnEdit.js			\
 	sdn/controllers/BgpEdit.js			\
@@ -333,12 +343,19 @@ JSSRC= 							\
 	sdn/fabrics/InterfacePanel.js			\
 	sdn/fabrics/NodeEdit.js				\
 	sdn/fabrics/FabricEdit.js			\
+	sdn/fabrics/RedistributionGrid.js			\
 	sdn/fabrics/openfabric/InterfacePanel.js	\
 	sdn/fabrics/openfabric/NodeEdit.js		\
 	sdn/fabrics/openfabric/FabricEdit.js		\
 	sdn/fabrics/ospf/InterfacePanel.js		\
 	sdn/fabrics/ospf/NodeEdit.js			\
 	sdn/fabrics/ospf/FabricEdit.js			\
+	sdn/fabrics/wireguard/InterfacePanel.js		\
+	sdn/fabrics/wireguard/NodeEdit.js		\
+	sdn/fabrics/wireguard/FabricEdit.js		\
+	sdn/fabrics/bgp/InterfacePanel.js		\
+	sdn/fabrics/bgp/NodeEdit.js			\
+	sdn/fabrics/bgp/FabricEdit.js			\
 	storage/ContentView.js				\
 	storage/BackupView.js				\
 	storage/Base.js					\

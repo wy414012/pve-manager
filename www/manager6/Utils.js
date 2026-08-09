@@ -193,13 +193,17 @@ Ext.define('PVE.Utils', {
                 } else {
                     return `<span style="text-decoration: line-through;">${Ext.htmlEncode(value)}</span>`;
                 }
-            } else if (rec.data.pending[key] !== undefined && rec.data.pending[key] !== null) {
+            } else if (
+                rec.data?.pending?.[key] !== undefined &&
+                rec.data?.pending?.[key] !== null
+            ) {
                 if (rec.data.pending[key] === 'deleted') {
                     return ' ';
                 } else {
                     return Ext.htmlEncode(rec.data.pending[key]);
                 }
             }
+
             return Ext.htmlEncode(value);
         },
 
@@ -216,7 +220,7 @@ Ext.define('PVE.Utils', {
 
             let tip = gettext('Pending Changes') + ': <br>';
 
-            for (const [key, keyvalue] of Object.entries(rec.data.pending)) {
+            for (const [key, keyvalue] of Object.entries(rec.data.pending ?? {})) {
                 if (
                     (rec.data[key] !== undefined && rec.data.pending[key] !== rec.data[key]) ||
                     rec.data[key] === undefined
@@ -268,6 +272,34 @@ Ext.define('PVE.Utils', {
             }
 
             return '<i class="fa fa-' + iconCls + '"></i> ' + value;
+        },
+
+        validateZfsBlocksize: function (value) {
+            if (!value) {
+                return true;
+            }
+
+            let match = value.match(/^([1-9][0-9]*)([km])?$/i);
+            if (!match) {
+                return gettext(
+                    'Invalid format. Use numbers with optional k or m suffix (e.g., 16k).',
+                );
+            }
+
+            let bytes = parseInt(match[1], 10);
+            let suffix = match[2]?.toLowerCase();
+
+            if (suffix === 'k') {
+                bytes *= 1024;
+            } else if (suffix === 'm') {
+                bytes *= 1024 * 1024;
+            }
+
+            if (bytes < 512 || (bytes & (bytes - 1)) !== 0 || bytes > 16 * 1024 * 1024) {
+                return gettext('Value must be a power of 2 between 512 and 16m');
+            }
+
+            return true;
         },
 
         render_pbs_fingerprint: (fp) => fp.substring(0, 23),
@@ -1240,7 +1272,8 @@ Ext.define('PVE.Utils', {
         calculate_disk_usage: function (data) {
             if (
                 !Ext.isNumeric(data.disk) ||
-                ((data.type === 'qemu' || data.type === 'lxc') && data.uptime === 0) ||
+                data.type === 'qemu' ||
+                (data.type === 'lxc' && data.uptime === 0) ||
                 data.maxdisk === 0
             ) {
                 return -1;
@@ -1265,7 +1298,8 @@ Ext.define('PVE.Utils', {
             if (
                 !Ext.isNumeric(disk) ||
                 maxdisk === 0 ||
-                ((type === 'qemu' || type === 'lxc') && record.data.uptime === 0)
+                type === 'qemu' ||
+                (type === 'lxc' && record.data.uptime === 0)
             ) {
                 return '';
             }
@@ -1776,6 +1810,9 @@ Ext.define('PVE.Utils', {
         qemu_min_version: function (toCheck, minVersion) {
             let i;
             for (i = 0; i < toCheck.length && i < minVersion.length; i++) {
+                if (toCheck[i] > minVersion[i]) {
+                    return true;
+                }
                 if (toCheck[i] < minVersion[i]) {
                     return false;
                 }

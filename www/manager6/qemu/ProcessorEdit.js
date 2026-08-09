@@ -117,12 +117,19 @@ Ext.define('PVE.qemu.ProcessorInputPanel', {
         me.lookup('cpuFlags').setArch(arch);
     },
 
+    setKvm: function (kvm) {
+        let me = this;
+        kvm = kvm ?? 1;
+        me.kvm = kvm;
+        me.lookup('cputype').setKvm(kvm);
+        me.lookup('cpuFlags').setKvm(kvm);
+    },
+
     column1: [
         {
             xtype: 'proxmoxintegerfield',
             name: 'sockets',
             minValue: 1,
-            maxValue: 4,
             value: '1',
             fieldLabel: gettext('Sockets'),
             allowBlank: false,
@@ -246,7 +253,7 @@ Ext.define('PVE.qemu.ProcessorInputPanel', {
         {
             xtype: 'label',
             reference: 'cpuFlagsLabel',
-            text: 'Extra CPU Flags:',
+            text: gettext('Extra CPU Flags:'),
         },
         {
             xtype: 'vmcpuflagselector',
@@ -300,7 +307,11 @@ Ext.define('PVE.qemu.ProcessorEdit', {
                     }
 
                     let caps = Ext.state.Manager.get('GuiCap');
-                    if (data.cputype.indexOf('custom-') === 0 && !caps.nodes['Sys.Audit']) {
+                    let canReuseCustom =
+                        caps.nodes['Sys.Audit'] ||
+                        caps.mapping['Mapping.Use'] ||
+                        caps.mapping['Mapping.Modify'];
+                    if (data.cputype.indexOf('custom-') === 0 && !canReuseCustom) {
                         let vm = ipanel.getViewModel();
                         vm.set('showCustomModelPermWarning', true);
                     }
@@ -319,6 +330,7 @@ Ext.define('PVE.qemu.ProcessorEdit', {
                 }
                 me.setValues(data);
                 ipanel.setArch(arch);
+                ipanel.setKvm(data.kvm);
             },
         });
     },

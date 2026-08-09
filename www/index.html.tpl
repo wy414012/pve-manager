@@ -27,6 +27,8 @@
     <script type='text/javascript'>
         function gettext(message) { return message; }
         function ngettext(singular, plural, count) { return count === 1 ? singular : plural; }
+        function pgettext(context, message) { return message; }
+        function npgettext(context, singular, plural, count) { return count === 1 ? singular : plural; }
     </script>
     [% END %]
     [%- IF debug %]
@@ -43,6 +45,7 @@
         Setup: { auth_cookie_name: 'PVEAuthCookie' },
         defaultLang: '[% lang %]',
         NodeName: '[% nodename %]',
+        NodeArch: '[% arch %]',
         UserName: '[% username %]',
         CSRFPreventionToken: '[% token %]',
         ConsentText: '[% consenttext %]'

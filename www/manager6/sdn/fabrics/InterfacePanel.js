@@ -6,10 +6,15 @@ Ext.define('PVE.sdn.Fabric.InterfacePanel', {
 
     nodeInterfaces: {},
 
+    hasIpv4Support: true,
+    hasIpv6Support: true,
+
     selModel: {
         mode: 'SIMPLE',
         type: 'checkboxmodel',
     },
+
+    maxHeight: 500,
 
     commonColumns: [
         {
@@ -55,19 +60,6 @@ Ext.define('PVE.sdn.Fabric.InterfacePanel', {
             dataIndex: 'type',
             flex: 1,
         },
-        {
-            text: gettext('IP'),
-            xtype: 'widgetcolumn',
-            dataIndex: 'ip',
-            flex: 1,
-            widget: {
-                xtype: 'proxmoxtextfield',
-                isFormField: false,
-                bind: {
-                    disabled: '{record.isDisabled}',
-                },
-            },
-        },
     ],
 
     additionalColumns: [],
@@ -106,6 +98,44 @@ Ext.define('PVE.sdn.Fabric.InterfacePanel', {
     initComponent: function () {
         let me = this;
 
+        let columns = [...me.commonColumns];
+
+        if (me.hasIpv4Support) {
+            columns.push({
+                text: gettext('IPv4'),
+                xtype: 'widgetcolumn',
+                dataIndex: 'ip',
+                flex: 1,
+                widget: {
+                    xtype: 'proxmoxtextfield',
+                    isFormField: false,
+                    bind: {
+                        disabled: '{record.isDisabled}',
+                    },
+                },
+            });
+        }
+
+        if (me.hasIpv6Support) {
+            columns.push({
+                text: gettext('IPv6'),
+                xtype: 'widgetcolumn',
+                dataIndex: 'ip6',
+                flex: 1,
+                widget: {
+                    xtype: 'proxmoxtextfield',
+                    isFormField: false,
+                    bind: {
+                        disabled: '{record.isDisabled}',
+                    },
+                },
+            });
+        }
+
+        if (me.additionalColumns.length > 0) {
+            columns.push(...me.additionalColumns);
+        }
+
         Ext.apply(me, {
             store: Ext.create('Ext.data.Store', {
                 model: 'Pve.sdn.Interface',
@@ -114,7 +144,7 @@ Ext.define('PVE.sdn.Fabric.InterfacePanel', {
                     direction: 'ASC',
                 },
             }),
-            columns: me.commonColumns.concat(me.additionalColumns),
+            columns,
         });
 
         me.callParent();
@@ -148,7 +178,11 @@ Ext.define('PVE.sdn.Fabric.InterfacePanel', {
                     continue;
                 }
 
-                if (['type', 'isDisabled'].includes(key)) {
+                if (
+                    ['type', 'isDisabled'].includes(key) ||
+                    (key === 'ip' && !me.hasIpv4Support) ||
+                    (key === 'ip6' && !me.hasIpv6Support)
+                ) {
                     continue;
                 }
 

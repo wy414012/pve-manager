@@ -27,7 +27,10 @@ use PVE::API2Tools;
 
 use base qw(PVE::RESTHandler);
 
-my $subscription_pattern = 'pve([1248])([cbsp])-[0-9a-f]{10}';
+# Subscription keys are pve<sockets><level>-<serial>; arm64 keys carry an extra '-arm-'
+# architecture marker before the serial. Accept every level for either architecture; which levels
+# are actually sold per architecture is the web shop's decision, not ours to encode here.
+my $key_pattern = 'pve([1248])([cbsp])-(arm-)?[0-9a-f]{10}';
 my $filename = "/etc/subscription";
 
 sub get_sockets {
@@ -38,8 +41,9 @@ sub get_sockets {
 sub parse_key {
     my ($key, $noerr) = @_;
 
-    if ($key =~ m/^${subscription_pattern}$/) {
-        return wantarray ? ($1, $2) : $1; # number of sockets, level
+    if ($key =~ m/^${key_pattern}$/) {
+        # number of sockets, level, architecture (the '-arm-' marker denotes arm64)
+        return wantarray ? ($1, $2, ($3 ? 'arm64' : 'amd64')) : $1;
     }
     return undef if $noerr;
 
@@ -49,16 +53,20 @@ sub parse_key {
 sub check_key {
     my ($key, $req_sockets) = @_;
 
-    my ($sockets, $level) = parse_key($key);
+    my ($sockets, $level, $arch) = parse_key($key);
     if ($sockets < $req_sockets) {
         die "wrong number of sockets ($sockets < $req_sockets)\n";
+    }
+    my $host_arch = PVE::Tools::get_host_dpkg_arch();
+    if ($arch ne $host_arch) {
+        die "subscription key is for the '$arch' architecture, but this host is '$host_arch'\n";
     }
     return ($sockets, $level);
 }
 
 sub read_etc_subscription {
     my $req_sockets = get_sockets();
-    my $server_id = PVE::API2Tools::get_hwaddress();
+    my $server_id_candidates = Proxmox::RS::Subscription::get_hardware_address_candidates();
 
     my $info = Proxmox::RS::Subscription::read_subscription($filename);
 
@@ -89,7 +97,7 @@ my sub cache_is_valid {
 sub write_etc_subscription {
     my ($info) = @_;
 
-    my $server_id = PVE::API2Tools::get_hwaddress();
+    my $server_id_candidates = Proxmox::RS::Subscription::get_hardware_address_candidates();
     mkdir "/etc/apt/auth.conf.d";
     Proxmox::RS::Subscription::write_subscription(
         $filename,
@@ -205,7 +213,8 @@ __PACKAGE__->register_method({
         my $authuser = $rpcenv->get_user();
         my $has_permission = $rpcenv->check($authuser, "/nodes/$node", ['Sys.Audit'], 1);
 
-        my $server_id = PVE::API2Tools::get_hwaddress();
+        my $server_id_candidates = Proxmox::RS::Subscription::get_hardware_address_candidates();
+        my $server_id = $server_id_candidates->[0]->[1];
         my $url = "https://www.proxmox.com/en/proxmox-virtual-environment/pricing";
 
         my $info = read_etc_subscription();
@@ -227,7 +236,15 @@ __PACKAGE__->register_method({
             };
         }
 
-        $info->{serverid} = $server_id;
+        # none set yet
+        $info->{serverid} = $server_id if !defined($info->{serverid});
+
+        if (
+            (grep { my $id = $_->[1]; $id eq $info->{serverid} } $server_id_candidates->@*) < 1
+        ) {
+            # mismatch, reset
+            $info->{serverid} = $server_id;
+        }
         $info->{sockets} = get_sockets();
         $info->{url} = $url;
 
@@ -264,8 +281,12 @@ __PACKAGE__->register_method({
         my $info = read_etc_subscription();
         return undef if !$info;
 
-        my $server_id = PVE::API2Tools::get_hwaddress();
+        my $server_id_candidates = Proxmox::RS::Subscription::get_hardware_address_candidates();
         my $key = $info->{key};
+        my $server_id = $info->{serverid} // $server_id_candidates->[0]->[1];
+        if ((grep { my $id = $_->[1]; $id eq $server_id } $server_id_candidates->@*) < 1) {
+            die "no matching server ID found\n";
+        }
 
         die
             "Updating offline key not possible - please remove and re-add subscription key to switch to online key.\n"
@@ -306,7 +327,7 @@ __PACKAGE__->register_method({
             key => {
                 description => "Proxmox VE subscription key",
                 type => 'string',
-                pattern => "\\s*${subscription_pattern}\\s*",
+                pattern => "\\s*${key_pattern}\\s*",
                 maxLength => 32,
             },
         },
@@ -324,7 +345,10 @@ __PACKAGE__->register_method({
         };
 
         my $req_sockets = get_sockets();
-        my $server_id = PVE::API2Tools::get_hwaddress();
+        my $server_id_candidates = Proxmox::RS::Subscription::get_hardware_address_candidates();
+        my $server_id = $server_id_candidates->[0]->[1];
+
+        die "Failed to generate server ID\n" if !$server_id;
 
         check_key($key, $req_sockets);
 

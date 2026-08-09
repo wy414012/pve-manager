@@ -106,14 +106,22 @@ __PACKAGE__->register_method({
     # fixme: return a list instead of extjs tree format ?
     returns => {
         type => "object",
-        items => {
-            type => "object",
-            properties => {
-                flags => { type => "string" },
-                root => {
-                    type => "object",
-                    description => "Tree with OSDs in the CRUSH map structure.",
-                },
+        additionalProperties => 1,
+        properties => {
+            flags => {
+                type => "string",
+                optional => 1,
+                description => "Comma-joined list of currently-set OSD flags; absent"
+                    . " when no flags are set on the cluster.",
+            },
+            root => {
+                type => "object",
+                additionalProperties => 1,
+                description =>
+                    "Top-level CRUSH bucket; recursive structure with 'children' lists"
+                    . " holding nested buckets and OSD leaves. Per-node properties (status,"
+                    . " weight, in, usage, latencies, etc.) vary by node type and are not"
+                    . " statically typed here.",
             },
         },
     },
@@ -261,7 +269,6 @@ __PACKAGE__->register_method({
                     . " Fails if the available size is not enough.",
                 optional => 1,
                 type => 'number',
-                default => 'bluestore_block_db_size or 10% of OSD size',
                 requires => 'db_dev',
                 minimum => 1.0,
             },
@@ -280,7 +287,6 @@ __PACKAGE__->register_method({
                     . " Fails if the available size is not enough.",
                 optional => 1,
                 minimum => 0.5,
-                default => 'bluestore_block_wal_size or 1% of OSD size',
                 requires => 'wal_dev',
                 type => 'number',
             },
@@ -298,10 +304,10 @@ __PACKAGE__->register_method({
             'osds-per-device' => {
                 optional => 1,
                 type => 'integer',
-                minimum => '1',
-                description =>
-                    'OSD services per physical device. Only useful for fast NVMe devices"
-		    ." to utilize their performance better.',
+                minimum => 1,
+                description => "OSD services per physical device. Only useful for fast NVMe"
+                    . " devices to utilize their performance better. Mutually exclusive"
+                    . " with 'db_dev' and 'wal_dev'.",
             },
         },
     },
@@ -418,9 +424,6 @@ __PACKAGE__->register_method({
             file_set_contents($ceph_bootstrap_osd_keyring, $bindata);
         }
 
-        # See FIXME below
-        my @udev_trigger_devs = ();
-
         # $size is in kibibytes
         my $osd_lvcreate = sub {
             my ($vg, $lv, $size) = @_;
@@ -471,8 +474,6 @@ __PACKAGE__->register_method({
                     warn $@ if $@;
                 }
 
-                push @udev_trigger_devs, $dev->{devpath};
-
                 return "$vg/$lv";
 
             } elsif ($dev->{used} eq 'LVM') {
@@ -514,7 +515,6 @@ __PACKAGE__->register_method({
                     warn $@ if $@;
                 }
 
-                push @udev_trigger_devs, $part;
                 return $part;
             }
 
@@ -539,8 +539,6 @@ __PACKAGE__->register_method({
                 my $devname = $devs->{dev}->{name};
                 my $devpath = $disklist->{$devname}->{devpath};
                 print "create OSD on $devpath (bluestore)\n";
-
-                push @udev_trigger_devs, $devpath;
 
                 my $osd_size = $disklist->{$devname}->{size};
                 my $size_map = {
@@ -587,18 +585,20 @@ __PACKAGE__->register_method({
                 }
 
                 run_command($cmd);
-
-                # FIXME: Remove once we depend on systemd >= v249.
-                # Work around udev bug https://github.com/systemd/systemd/issues/18525 to ensure the
-                # udev database is updated.
-                eval { run_command(['udevadm', 'trigger', @udev_trigger_devs]); };
-                warn $@ if $@;
             });
         };
 
         return $rpcenv->fork_worker('cephcreateosd', $devs->{dev}->{name}, $authuser, $worker);
     },
 });
+
+my $probe_osd_encrypted = sub {
+    my ($dev_node) = @_;
+
+    return 0 if !$dev_node || $dev_node !~ m{^/dev/(dm-\d+)$};
+    my $uuid = eval { PVE::Tools::file_read_firstline("/sys/block/$1/dm/uuid") };
+    return $uuid && $uuid =~ /^CRYPT-LUKS\d-/ ? 1 : 0;
+};
 
 my $OSD_DEV_RETURN_PROPS = {
     device => {
@@ -610,17 +610,18 @@ my $OSD_DEV_RETURN_PROPS = {
         type => 'string',
         description => 'Device node',
     },
-    devices => {
+    physical_device => {
         type => 'string',
-        description => 'Physical disks used',
+        description => "Underlying physical device(s) used by this OSD device (comma- or"
+            . " space-joined when multiple).",
     },
     size => {
         type => 'integer',
-        description => 'Size in bytes',
+        description => 'Size of the OSD device in bytes.',
     },
     support_discard => {
         type => 'boolean',
-        description => 'Discard support of the physical device',
+        description => 'Whether the underlying physical device supports discard/TRIM.',
     },
     type => {
         type => 'string',
@@ -700,7 +701,9 @@ __PACKAGE__->register_method({
                     },
                     mem_usage => {
                         type => 'integer',
-                        description => 'Memory usage of the OSD service.',
+                        description =>
+                            "Proportional set size (PSS) memory usage of the OSD daemon"
+                            . " process in bytes; 0 when the process is not running.",
                     },
                     osd_data => {
                         type => 'string',
@@ -712,7 +715,9 @@ __PACKAGE__->register_method({
                     },
                     pid => {
                         type => 'integer',
-                        description => 'OSD process ID.',
+                        optional => 1,
+                        description => "OSD process ID; absent if the systemd unit for this OSD"
+                            . " is not currently running.",
                     },
                     version => {
                         type => 'string',
@@ -733,6 +738,10 @@ __PACKAGE__->register_method({
                     hb_back_addr => {
                         type => 'string',
                         description => 'Heartbeat address and port for other OSDs.',
+                    },
+                    encrypted => {
+                        type => 'boolean',
+                        description => 'Whether the OSD is encrypted with LUKS via dm-crypt.',
                     },
                 },
             },
@@ -785,14 +794,16 @@ __PACKAGE__->register_method({
                 mem_usage => $osd_pss_memory,
                 osd_data => $metadata->{osd_data},
                 osd_objectstore => $metadata->{osd_objectstore},
-                pid => $pid,
                 version => "$metadata->{ceph_version_short} ($metadata->{ceph_release})",
                 front_addr => $metadata->{front_addr},
                 back_addr => $metadata->{back_addr},
                 hb_front_addr => $metadata->{hb_front_addr},
                 hb_back_addr => $metadata->{hb_back_addr},
+                encrypted => $probe_osd_encrypted->($metadata->{bluestore_bdev_dev_node}),
             },
         };
+        # systemd emits MainPID=0 when the unit is not running; map that falsy value to absent.
+        $data->{osd}->{pid} = $pid if $pid;
 
         $data->{devices} = [];
 
@@ -804,7 +815,9 @@ __PACKAGE__->register_method({
                     dev_node => $metadata->{"${prefix}_${dev}_dev_node"},
                     physical_device => $metadata->{"${prefix}_${dev}_devices"},
                     size => int($metadata->{"${prefix}_${dev}_size"}),
-                    support_discard => int($metadata->{"${prefix}_${dev}_support_discard"}),
+                    support_discard => $metadata->{"${prefix}_${dev}_support_discard"}
+                    ? JSON::true
+                    : JSON::false,
                     type => $metadata->{"${prefix}_${dev}_type"},
                     device => $device,
                 },
@@ -922,8 +935,12 @@ __PACKAGE__->register_method({
     },
 });
 
-# Check if $osdid belongs to $nodename
+# Check if $osdid belongs to $nodename, by CRUSH ownership.
 # $tree ... rados osd tree (passing the tree makes it easy to test)
+#
+# Note: PVE::Ceph::Services::get_node_daemons uses the systemd/filesystem view
+# instead for the rolling-restart path. CRUSH ownership is the right gate for
+# destroy; systemd unit existence is the right primitive for restart.
 sub osd_belongs_to_node {
     my ($tree, $nodename, $osdid) = @_;
     return 0 if !($tree && $tree->{nodes});
@@ -957,7 +974,11 @@ __PACKAGE__->register_method({
                 type => 'integer',
             },
             cleanup => {
-                description => "If set, we remove partition table entries.",
+                description => "If set, also destroy the underlying logical volumes via"
+                    . " 'ceph-volume lvm zap --destroy', remove the volume group's physical"
+                    . " volume with pvremove, and wipe any journal/block.db/block.wal"
+                    . " partitions left over from filestore OSDs. Without this flag the LVs"
+                    . " and partitions are left intact for inspection.",
                 type => 'boolean',
                 optional => 1,
                 default => 0,
@@ -1049,17 +1070,12 @@ __PACKAGE__->register_method({
             # try to unmount from standard mount point
             my $mountpoint = "/var/lib/ceph/osd/ceph-$osdid";
 
-            # See FIXME below
-            my $udev_trigger_devs = {};
-
             my $remove_partition = sub {
                 my ($part) = @_;
 
                 return if !$part || (!-b $part);
                 my $partnum = PVE::Diskmanage::get_partnum($part);
                 my $devpath = PVE::Diskmanage::get_blockdev($part);
-
-                $udev_trigger_devs->{$devpath} = 1;
 
                 PVE::Diskmanage::wipe_blockdev($part);
                 print "remove partition $part (disk '${devpath}', partnum $partnum)\n";
@@ -1073,22 +1089,6 @@ __PACKAGE__->register_method({
 
                 eval { PVE::Ceph::Tools::ceph_volume_zap($osdid, $cleanup) };
                 warn $@ if $@;
-
-                if ($cleanup) {
-                    # try to remove pvs, but do not fail if it does not work
-                    for my $osd_part (@{ $osd_list->{$osdid} }) {
-                        for my $dev (@{ $osd_part->{devices} }) {
-                            ($dev) = ($dev =~ m|^(/dev/[-_.a-zA-Z0-9\/]+)$|); #untaint
-
-                            eval {
-                                run_command(['/sbin/pvremove', $dev], errfunc => sub { });
-                            };
-                            warn $@ if $@;
-
-                            $udev_trigger_devs->{$dev} = 1;
-                        }
-                    }
-                }
             } else {
                 my $partitions_to_remove = [];
                 if ($cleanup) {
@@ -1123,14 +1123,6 @@ __PACKAGE__->register_method({
                         $remove_partition->($part);
                     }
                 }
-            }
-
-            # FIXME: Remove once we depend on systemd >= v249.
-            # Work around udev bug https://github.com/systemd/systemd/issues/18525 to ensure the
-            # udev database is updated.
-            if ($cleanup) {
-                eval { run_command(['udevadm', 'trigger', keys $udev_trigger_devs->%*]); };
-                warn $@ if $@;
             }
         };
 

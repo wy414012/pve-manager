@@ -218,6 +218,7 @@ Ext.define('PVE.lxc.CreateWizard', {
                     xtype: 'pveFileSelector',
                     name: 'ostemplate',
                     storageContent: 'vztmpl',
+                    archFilter: true,
                     fieldLabel: gettext('Template'),
                     bind: {
                         storage: '{storage}',
@@ -234,6 +235,9 @@ Ext.define('PVE.lxc.CreateWizard', {
             isCreate: true,
             unused: false,
             confid: 'rootfs',
+            bind: {
+                nodename: '{nodename}',
+            },
         },
         {
             xtype: 'pveLxcCPUInputPanel',

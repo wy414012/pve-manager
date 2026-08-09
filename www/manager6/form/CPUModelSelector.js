@@ -1,6 +1,12 @@
 Ext.define('PVE.data.CPUModel', {
     extend: 'Ext.data.Model',
-    fields: [{ name: 'name' }, { name: 'vendor' }, { name: 'custom' }, { name: 'displayname' }],
+    fields: [
+        { name: 'name' },
+        { name: 'vendor' },
+        { name: 'custom' },
+        { name: 'abstract' },
+        { name: 'displayname' },
+    ],
 });
 
 Ext.define('PVE.form.CPUModelSelector', {
@@ -17,8 +23,15 @@ Ext.define('PVE.form.CPUModelSelector', {
     anyMatch: true,
     forceSelection: true,
     autoSelect: false,
+    triggerAction: 'query',
 
     deleteEmpty: true,
+    config: {
+        showCustomModels: true,
+        // PVE-internal abstract profiles (x86-64-vN) resolve to qemu64 + flag set
+        // at VM start and are not valid as a custom CPU model's reported-model.
+        showAbstractModels: true,
+    },
 
     getSubmitData: function () {
         let me = this,
@@ -77,6 +90,40 @@ Ext.define('PVE.form.CPUModelSelector', {
         let defaultCPU = PVE.qemu.Architecture.defaultProcessorModel[arch] ?? 'kvm64';
 
         me.setEmptyText(`${Proxmox.Utils.defaultText} (${defaultCPU})`);
+
+        if (me.rendered) {
+            me.validate();
+        }
+    },
+
+    // ARM QEMU accepts only host/max and the legacy cortex-a53/-a57 KVM targets under KVM; every
+    // other named model has no KVM target and is rejected at VM start. Flag such a choice, but only
+    // while KVM is enabled, as the emulated models do work without it.
+    kvm: 1,
+
+    setKvm: function (kvm) {
+        let me = this;
+        me.kvm = kvm ?? 1;
+        if (me.rendered) {
+            me.validate();
+        }
+    },
+
+    validator: function (value) {
+        let me = this;
+        if (me.arch !== 'aarch64' || !me.kvm || !value || value.startsWith('custom-')) {
+            return true;
+        }
+        if (['host', 'max', 'cortex-a53', 'cortex-a57'].includes(value)) {
+            return true;
+        }
+        return Ext.String.format(
+            gettext(
+                "The CPU model '{0}' is not usable with KVM on ARM; choose 'host' or 'max'," +
+                    ' or disable KVM.',
+            ),
+            value,
+        );
     },
 
     store: {
@@ -134,5 +181,15 @@ Ext.define('PVE.form.CPUModelSelector', {
                 }
             },
         },
+    },
+    initComponent: function () {
+        let me = this;
+        me.callParent();
+        if (!me.showCustomModels) {
+            me.getStore().addFilter({ filterFn: (rec) => !rec.data.custom });
+        }
+        if (!me.showAbstractModels) {
+            me.getStore().addFilter({ filterFn: (rec) => !rec.data.abstract });
+        }
     },
 });

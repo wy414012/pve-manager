@@ -27,10 +27,11 @@ use PVE::API2::Backup;
 use PVE::API2::Cluster::BackupInfo;
 use PVE::API2::Cluster::BulkAction;
 use PVE::API2::Cluster::Ceph;
-use PVE::API2::Cluster::Mapping;
 use PVE::API2::Cluster::Jobs;
+use PVE::API2::Cluster::Mapping;
 use PVE::API2::Cluster::MetricServer;
 use PVE::API2::Cluster::Notifications;
+use PVE::API2::Cluster::Qemu;
 use PVE::API2::ClusterConfig;
 use PVE::API2::Firewall::Cluster;
 use PVE::API2::HAConfig;
@@ -57,6 +58,11 @@ __PACKAGE__->register_method({
 __PACKAGE__->register_method({
     subclass => "PVE::API2::Cluster::Notifications",
     path => 'notifications',
+});
+
+__PACKAGE__->register_method({
+    subclass => "PVE::API2::Cluster::Qemu",
+    path => 'qemu',
 });
 
 __PACKAGE__->register_method({
@@ -166,6 +172,7 @@ __PACKAGE__->register_method({
             { name => 'notifications' },
             { name => 'nextid' },
             { name => 'options' },
+            { name => 'qemu' },
             { name => 'replication' },
             { name => 'resources' },
             { name => 'status' },
@@ -779,7 +786,19 @@ __PACKAGE__->register_method({
     },
     returns => {
         type => "object",
-        properties => {},
+        # the writable datacenter options plus the read-only 'allowed-tags'; left open
+        # ('additionalProperties' unset) as not all options are returned without 'Sys.Audit'
+        properties => {
+            $dc_schema->{properties}->%*,
+            'allowed-tags' => {
+                type => 'array',
+                description => 'The tags the current user is allowed to set and see.',
+                items => {
+                    type => 'string',
+                    description => 'A tag.',
+                },
+            },
+        },
     },
     code => sub {
         my ($param) = @_;
