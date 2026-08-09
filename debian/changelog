@@ -1,3 +1,14 @@
+pve-manager (8.4.20-1) bookworm; urgency=medium
+
+  * vzdump: require the 'Sys.Modify' privilege on '/nodes/<node>' for the
+    'stop' parameter, which aborts the backup tasks currently running on that
+    node, modeled after what the task API requires for stopping a task one
+    does not own.
+  * pve8to9: avoid logging a failure when the old kernel metapackages are no
+    longer installed.
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Sun, 09 Aug 2026 21:49:23 +0800
+
 pve-manager (8.4.19-1) bookworm; urgency=medium
 
   * ui: prepare notice for slowly nearing Proxmox VE 8 End-of-Life after
@@ -22,6 +33,17 @@ pve-manager (8.4.16-1) bookworm; urgency=medium
   * pveupdate: do not try to update subscription when using offline key.
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 06 Feb 2026 15:50:25 +0800
+
+pve-manager (8.4.20) bookworm; urgency=medium
+
+  * vzdump: require the 'Sys.Modify' privilege on '/nodes/<node>' for the
+    'stop' parameter, which aborts the backup tasks currently running on that
+    node, modeled after what the task API requires for stopping a task one
+    does not own.
+  * pve8to9: avoid logging a failure when the old kernel metapackages are no
+    longer installed.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 04 Aug 2026 13:58:42 +0200
 
 pve-manager (8.4.19) bookworm; urgency=medium
 
@@ -128,7 +150,7 @@ pve-manager (8.4.11) bookworm; urgency=medium
 
 pve-manager (8.4.10) bookworm; urgency=medium
 
-  * 合并稳定版修复补�?
+  * 合并稳定版修复补丁
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 12 Aug 2025 10:02:28 +0800
 
@@ -156,7 +178,7 @@ pve-manager (8.4.8) bookworm; urgency=medium
 
 pve-manager (8.4.7-4) bookworm; urgency=medium
 
-  * 移除订阅检�?
+  * 移除订阅检测
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Tue, 05 Aug 2025 00:33:05 +0800
 
@@ -686,11 +708,11 @@ pve-manager (8.2.5) bookworm; urgency=medium
 
 pve-manager (8.2.4-1) bookworm; urgency=medium
 
-  * 更新版本�?: 扩容版本�?
+  * 更新版本�?: 扩容版本�?
 
   * 更新日志：添加温度和CPU频率模块支持，依赖于apt install lm-sensors linux-cpupower -y
 
-  * 依赖�?: apt install lm-sensors linux-cpupower -y
+  * 依赖�?: apt install lm-sensors linux-cpupower -y
 
   * 添加执行权限：chmod +s /usr/sbin/turbostat
 

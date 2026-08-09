@@ -162,7 +162,7 @@ my $log_systemd_unit_state = sub {
 
 my $versions;
 my $get_pkg = sub {
-    my ($pkg) = @_;
+    my ($pkg, $noerr) = @_;
 
     $versions = eval { PVE::API2::APT->versions({ node => $nodename }) } if !defined($versions);
 
@@ -175,7 +175,7 @@ my $get_pkg = sub {
 
     my $pkgs = [grep { $_->{Package} eq $pkg } @$versions];
     if (!defined $pkgs || $pkgs == 0) {
-        log_fail("unable to determine installed $pkg version.");
+        log_fail("unable to determine installed $pkg version.") if !$noerr;
         return undef;
     } else {
         return $pkgs->[0];
@@ -255,7 +255,7 @@ sub check_pve_packages {
             my $outdated_kernel_meta_pkgs = [];
             for my $kernel_meta_version ('6.2', '6.5', '6.8', '6.11') {
                 my $pkg = "pve-kernel-${kernel_meta_version}";
-                if ($get_pkg->($pkg)) {
+                if ($get_pkg->($pkg, 1)) {
                     push @$outdated_kernel_meta_pkgs, $pkg;
                 }
             }
