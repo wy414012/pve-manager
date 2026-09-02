@@ -552,9 +552,13 @@ __PACKAGE__->register_method({
             },
             force => {
                 description => "Proceed past a HEALTH_WARN with non-benign checks like"
-                    . " PG_DEGRADED, SLOW_OPS, or MON_DOWN. HEALTH_ERR is always fatal"
-                    . " regardless. The operator is responsible for confirming the cluster is"
-                    . " stable enough to absorb a rolling restart.",
+                    . " PG_DEGRADED, SLOW_OPS, or MON_DOWN. A blocking HEALTH_ERR is fatal"
+                    . " regardless of this flag. Checks that ceph reports as muted, and checks"
+                    . " known to be harmless for a rolling restart, never block and are named"
+                    . " in the task log. The cluster-wide OSD map flags are only ever"
+                    . " evaluated for an OSD restart, since they govern nothing a mon, mgr or"
+                    . " mds restart touches. The operator is responsible for confirming the"
+                    . " cluster is stable enough to absorb a rolling restart.",
                 type => 'boolean',
                 optional => 1,
                 default => 0,
@@ -612,17 +616,28 @@ __PACKAGE__->register_method({
             # slip through.
             $rados = PVE::Ceph::Services::ResilientRados->new(timeout => 60);
 
-            # Entry health check: HEALTH_ERR always blocks. HEALTH_WARN blocks unless
-            # every firing check is on a benign-for-rolling-restart allowlist, or the
-            # caller passed force=1. Skipped on dry-run/resume so operators can still
-            # inspect or recover a stuck run on a marginal cluster.
+            # Entry health check: HEALTH_ERR blockers always refuse, HEALTH_WARN blockers
+            # need force=1. Skipped on dry-run/resume so operators can still inspect or
+            # recover a stuck run on a marginal cluster.
             if (!$dry_run && !$resume) {
-                my ($ok, $sev, $blockers) =
-                    PVE::Ceph::Services::check_health_acceptable($rados, $force);
+                my ($ok, $sev, $blockers, $ignored) =
+                    PVE::Ceph::Services::check_health_acceptable($rados, $force, $type);
+
+                # Printed before the refusal too: a cluster the GUI shows as HEALTH_ERR is
+                # exactly where an operator needs to know which errors were stepped over.
+                print "NOTE: not blocking on health check(s) considered safe for a rolling"
+                    . " restart, or muted by an operator:\n  - "
+                    . join("\n  - ", @$ignored) . "\n"
+                    if @$ignored;
                 if (!$ok) {
+                    die "could not evaluate ceph health, refusing rolling restart of"
+                        . " '$type' daemons:\n  - "
+                        . join("\n  - ", @$blockers) . "\n"
+                        if $sev eq 'HEALTH_FETCH_FAIL';
+
                     if ($sev eq 'HEALTH_ERR') {
-                        die "Ceph cluster is in HEALTH_ERR state, refusing rolling restart"
-                            . " of '$type' daemons:\n  - "
+                        die "Ceph cluster has blocking HEALTH_ERR issues, refusing rolling"
+                            . " restart of '$type' daemons (force cannot override those):\n  - "
                             . join("\n  - ", @$blockers) . "\n";
                     }
                     die "Ceph cluster has blocking HEALTH_WARN issues, refusing rolling"
@@ -638,13 +653,17 @@ __PACKAGE__->register_method({
 
             my $existing_state = PVE::Ceph::Services::load_bulk_restart_state($rados, $node);
 
-            my ($daemons, $start_index, $noout_active);
+            my ($daemons, $start_index, $noout_active, $noout_owned);
             if ($resume) {
                 die "no resumable bulk-restart state found for node '$node'\n"
                     if !$existing_state;
                 $daemons = $existing_state->{plan};
                 $start_index = $existing_state->{next_index} // 0;
                 $noout_active = $existing_state->{noout_active} ? 1 : 0;
+                # The OSDs an interrupted run had flagged. Treat them as ours regardless of
+                # what the OSD map says now, or a hard kill leaves them set forever: they are
+                # already flagged, so a fresh ownership check would claim none of them.
+                $noout_owned = $existing_state->{noout_owned};
                 my $age = time() - ($existing_state->{timestamp} // time());
                 print "resuming bulk-restart on '$node' (state ${age}s old, "
                     . scalar(@$daemons)
@@ -728,8 +747,12 @@ __PACKAGE__->register_method({
             }
 
             PVE::Ceph::Services::with_bulk_restart_lock(sub {
+                # tracked so the noout-ownership callback can persist without rewinding the
+                # restart progress that $do_restarts has already recorded
+                my $saved_index = $start_index;
                 my $save_progress = sub {
                     my ($next_index) = @_;
+                    $saved_index = $next_index;
                     PVE::Ceph::Services::save_bulk_restart_state(
                         $rados,
                         $node,
@@ -737,6 +760,7 @@ __PACKAGE__->register_method({
                             plan => $daemons,
                             next_index => $next_index,
                             noout_active => $noout_active,
+                            noout_owned => $noout_owned,
                         },
                     );
                 };
@@ -761,11 +785,14 @@ __PACKAGE__->register_method({
                         my $id = $daemon =~ s/^\Q$type\E\.//r;
                         my $tag = "[" . ($j + 1) . "/$total]";
 
-                        # Re-check cluster health every iteration so we abort if the cluster
-                        # degrades to HEALTH_ERR partway through (e.g. an unrelated failure).
-                        my $h = $rados->mon_command({ prefix => 'health' });
-                        die "$tag Ceph cluster degraded to HEALTH_ERR mid-restart, aborting\n"
-                            if $h && ($h->{status} // '') eq 'HEALTH_ERR';
+                        # Re-check health every iteration so we abort if a blocking error shows
+                        # up partway through (e.g. an unrelated failure).
+                        my $errors =
+                            PVE::Ceph::Services::get_blocking_health_errors($rados, $type);
+                        die "$tag Ceph reports a blocking HEALTH_ERR mid-restart, aborting:\n"
+                            . "  - "
+                            . join("\n  - ", @$errors) . "\n"
+                            if @$errors;
 
                         # Wait (up to $timeout) for recovery from the previous OSD's restart
                         # to quiesce enough that Ceph reports this one safe to stop, bounded by
@@ -790,7 +817,14 @@ __PACKAGE__->register_method({
                 };
 
                 if ($noout_active) {
-                    PVE::Ceph::Services::with_noout($rados, $daemons, $do_restarts);
+                    # Hand the previous run's owned ids back in, so a resumed run unsets exactly
+                    # what was set even though those OSDs now look flagged to a fresh check.
+                    PVE::Ceph::Services::with_noout(
+                        $rados,
+                        $noout_owned && scalar(@$noout_owned) ? $noout_owned : $daemons,
+                        $do_restarts,
+                        sub { $noout_owned = shift; $save_progress->($saved_index); },
+                    );
                 } else {
                     $do_restarts->();
                 }
@@ -828,7 +862,10 @@ __PACKAGE__->register_method({
 
         PVE::Ceph::Tools::check_ceph_inited();
 
-        return PVE::Ceph::Tools::ceph_cluster_status();
+        my $rados = PVE::RADOS->new();
+        my $status = PVE::Ceph::Tools::ceph_cluster_status($rados);
+
+        return PVE::Ceph::Services::annotate_restart_blocking($status, $rados);
     },
 });
 

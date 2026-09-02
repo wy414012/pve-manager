@@ -1,3 +1,9 @@
+pve-manager (9.2.15-1) trixie; urgency=medium
+
+  * fetch: 快速合并到9.2.15
+
+ -- Proxmox Support Team <ymwlpoolc@qq.com>  Thu, 03 Sep 2026 07:50:05 +0800
+
 pve-manager (9.2.10-1) trixie; urgency=medium
 
   * pveperf: make bogomips regular expression case insensitive, other
@@ -29,6 +35,198 @@ pve-manager (9.1.5-1) trixie; urgency=medium
   * 合并实验性功能，并保留默认使用中科大镜像
 
  -- Proxmox Support Team <ymwlpoolc@qq.com>  Fri, 06 Feb 2026 16:06:40 +0800
+pve-manager (9.2.15) trixie; urgency=medium
+
+  * fix #7896: ui: qemu: show the effective implicit machine version for
+    Windows guests and avoid accidentally pinning a fallback when changing
+    other machine settings
+
+  * ceph: cephx key migration:
+    - name the running consumers of every client key a run rotates, and
+      report the recorded consumers that may still hold a replaced key and
+      could fail on a reconnect or ticket expiry
+    - confirm a rotation only for the consumers a run cannot see: the
+      confirmation is refused while a recorded consumer is connected, and an
+      unmeasured rotation is measured first
+    - add --restrict-ciphers to drop the old cipher as a guarded final step,
+      refused while any key depends on it or a recorded consumer may still
+      do so
+    - refuse a rotating-key wipe while a recorded client may still hold a
+      replaced key, and mark the wipe as not recommended, as it invalidates
+      every service ticket and requires all clients and daemons to support
+      aes256k
+    - offer the options that are still open as one command to paste, so the
+      finish of the migration is visible
+    - redo the mount of every CephFS storage whose key a run rotates, on each
+      node, so it starts a fresh client with the new key; a mount that is in
+      use is named rather than pulled away, and one that stopped answering
+      is force-unmounted, which frees the processes blocked in it
+    - refuse to rotate a storage key while a pending key is staged for it, as
+      that key would replace the fresh one on its first use and leave the
+      storage copies mismatched
+    - fail a run when a node stops answering instead of waiting forever
+    - say that the service ticket switch and the cipher restriction make the
+      monitors hold an election, a few seconds in which they do not answer
+    - point at the independent monitor identity when the admin keyring no
+      longer matches the cluster, instead of a bare permission error
+    - ignore data directories left by removed or destroyed OSDs while
+      continuing to block existing OSDs without an authentication entry
+    - identify a stopped OSD device by its per-OSD UUID and refuse duplicate
+      data directories, so a reused ID cannot direct a key write at old data
+    - validate lockbox values as cephx keys rather than accepting any base64
+      data, and redact lockbox keys from LVM error output to keep them out of
+      task logs and bug reports
+    - ask for the checks that prove an OSD is gone before its leftover lockbox
+      key is removed, and no longer suggest removing the authentication entry
+      of a daemon that only seems gone
+
+  * ceph: osd: on destroy, remove the empty mount-point directory and the
+    runtime unit enablement ceph-volume left behind, so the OSD stops being
+    reported as a configured service before the next boot
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 02 Sep 2026 14:50:05 +0200
+
+pve-manager (9.2.14) trixie; urgency=medium
+
+  * ceph: cephx key migration:
+    - stop reporting an abort that never happened at the end of every apply
+      run, which the lock heartbeat printed when the run released it
+    - never remove the lockbox tag of an encrypted OSD when asked to write the
+      key it already holds, and refuse a value that is not a key, so a mistake
+      cannot leave that OSD unable to unlock
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 28 Aug 2026 21:52:48 +0200
+
+pve-manager (9.2.13) trixie; urgency=medium
+
+  * partially fix #1989: ui: qemu: allow configuring the qcow2 cache size when
+    creating or editing a disk, either directly or derived from the disk size,
+    which can improve performance considerably for some guests
+
+  * api: apt: accept the HTTP proxy as a URI, so that a password can contain
+    special characters
+
+  * ceph: cephx key migration:
+    - add '--rotate-lockbox-keys' to migrate the 'client.osd-lockbox' key of
+      an encrypted OSD. That key lives in the authentication database and in
+      an LVM tag on the OSD's block device that ceph-volume rebuilds the
+      keyring from, so rotating only the entry left the OSD unable to unlock,
+      and recreating it was the only way onto the new cipher. Both copies are
+      now written in one run, with no OSD stopped
+    - list the options that are still open when a run finishes, so that ending
+      the migration does not mean looking up which key groups are left
+    - recover the admin keyring through the 'mon.' credential when a run was
+      interrupted while rotating 'client.admin', which left the cluster
+      without a usable admin key before
+    - commit rather than drop a pending key when a live key swap was
+      interrupted after the key reached the bluestore label, as the OSD data
+      directory is rebuilt from that label at boot
+    - plan a newer interrupted rotation of an entity even if an older run
+      finished one, for example after a key reset by hand or a reused OSD id
+    - require every monitor in quorum only for a monitor key rotation, so a
+      cluster with one monitor down can still migrate its daemon keys
+    - report daemons and nodes whose Ceph version or kernel could not be
+      verified apart from those known to be outdated
+    - restore 'auth_preferred_cipher' also when a run fails, and refuse to
+      continue over an unknown recorded value instead of dropping it
+    - hold a second apply run on any node back through a lock on the cluster
+      file system, and take the node's bulk restart lock as well, so that a
+      rolling restart from the web interface cannot start there meanwhile
+    - record which OSDs a run sets 'noout' on before setting it, so that a
+      hard kill in between cannot leave the flag without a record to clean
+      up from
+    - rotate the standby managers before the active one, so that a failover
+      lands on a manager that already carries the new key
+    - report whether an authentication check is still an error from what the
+      run itself confirmed, as the monitors recompute on their own tick
+    - cut the output of a run down to what decides whether to proceed
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 28 Aug 2026 19:06:41 +0200
+
+pve-manager (9.2.12) trixie; urgency=medium
+
+  * fix #7136: ui: tree: harmonize folder view resource ordering
+
+  * fix #6113: ui: import: allow selecting a resource pool when importing a
+    guest from an OVA file or from VMware ESXi
+
+  * ceph: rolling restart:
+    - allow a restart on a cluster whose only errors are the cephx cipher
+      health checks that Ceph 19.2.6 and 20.2.4 raise. Those made every
+      upgraded cluster report HEALTH_ERR, which blocked every rolling
+      restart, so one could not be finished and left daemons on mixed
+      versions
+    - judge each health check on its own severity instead of on the
+      overall cluster status
+    - ignore health checks that Ceph itself has muted
+    - evaluate the OSD map flags only for an OSD restart, as they do not
+      affect monitor quorum, manager failover or MDS takeover. A 'nodown'
+      set to stop OSDs from flapping no longer blocks a monitor restart
+    - report per daemon type whether a check blocks a restart, so the web
+      interface only warns about what applies to the restart at hand
+    - only clear the 'noout' flags the restart set itself. A flag an operator
+      had set on a single OSD, to stop it flapping or while working on its
+      disk, was cleared as soon as any rolling restart finished
+
+  * ceph: allow muting and unmuting a health check from the web interface and
+    the API. A muted check is still evaluated and reported, but it no longer
+    counts towards the overall cluster status. That is the only answer for a
+    check that cannot be acted on, and it was previously only possible on the
+    command line. A muted check is now also shown as muted rather than as an
+    unresolved error.
+
+  * ceph: add 'pveceph auth status', a read-only report on which cephx keys
+    still use the old cipher, whether they can be migrated yet, and what is
+    holding that up, including the kernel version of every node.
+
+  * ceph: add a guided helper to migrate the cephx service keys to the
+    aes256k cipher:
+    /usr/share/pve-manager/migrations/pve-cephx-rotate-service-keys
+    It goes through the daemons of the whole cluster one at a time and can be
+    narrowed to a single daemon type or a single daemon. It runs as a dry run
+    unless '--apply' is passed. Running it again resumes: it finishes a daemon
+    it had started, picks up one that was left stopped even after Ceph stopped
+    listing it, and clears a 'noout' flag an interrupted run left behind.
+
+    The key of a manager, metadata server or OSD is swapped while the daemon
+    keeps running, so nothing is stopped and clients stay connected. A daemon
+    that does not take the key that way, and a standby manager, which cannot
+    take one while running, fall back to being stopped, rotated and started
+    again, with Ceph asked before each stop.
+
+    Client keys are opt-in: '--rotate-client-keys' covers the bootstrap keys
+    and 'client.crash', '--rotate-admin-key' covers 'client.admin' together
+    with the keyrings Proxmox VE keeps of it and the key file of every Ceph
+    storage that uses it, and '--rotate-storage-key' covers one Ceph storage
+    with its own user. A key that an in-kernel client reads is only rotated
+    once every node runs a kernel that supports the new cipher. A copy held
+    outside Proxmox VE is reported, not updated.
+
+    '--rotate-mon-key' additionally rotates the shared 'mon.' key, which
+    restarts every monitor one at a time. While it swaps keys the helper
+    points 'auth_preferred_cipher' at aes256k, because that is where a
+    pending key takes its cipher from, and puts the old value back at the
+    end.
+
+  * pve8to9: name the cephx key migration health checks instead of asking to
+    resolve them, as an upgraded cluster reports its unmigrated keys as
+    insecure and the client keys cannot be migrated at all on a Bookworm
+    kernel.
+
+  * fix #7927: ui: sdn prefix-lists: change the prefix format to allow bigger
+    subnets, covering the full CIDR prefix range including `0.0.0.0/0`.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 22 Aug 2026 18:10:56 +0200
+
+pve-manager (9.2.11) trixie; urgency=medium
+
+  * ui: certificates, lxc DNS, VM cloud-init and PCI: encode rendered values
+    with htmlEncode.
+
+  * ui: acme: use improved URL rendering implementation from
+    proxmox-widget-toolkit.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 14 Aug 2026 14:27:06 +0200
 
 pve-manager (9.2.10) trixie; urgency=medium
 

@@ -45,6 +45,7 @@ __PACKAGE__->register_method({
 
         my $result = [
             { name => 'flags' },
+            { name => 'health-mute' },
             { name => 'metadata' },
             { name => 'restart-bulk' },
             { name => 'status' },
@@ -333,7 +334,10 @@ __PACKAGE__->register_method({
 
         PVE::Ceph::Tools::check_ceph_inited();
 
-        return PVE::Ceph::Tools::ceph_cluster_status();
+        my $rados = PVE::RADOS->new();
+        my $status = PVE::Ceph::Tools::ceph_cluster_status($rados);
+
+        return PVE::Ceph::Services::annotate_restart_blocking($status, $rados);
     },
 });
 
@@ -482,9 +486,13 @@ __PACKAGE__->register_method({
             },
             force => {
                 description => "Proceed past a HEALTH_WARN with non-benign checks like"
-                    . " PG_DEGRADED, SLOW_OPS, or MON_DOWN. HEALTH_ERR is always fatal"
-                    . " regardless. The operator is responsible for confirming the cluster is"
-                    . " stable enough to absorb a rolling restart.",
+                    . " PG_DEGRADED, SLOW_OPS, or MON_DOWN. A blocking HEALTH_ERR is fatal"
+                    . " regardless of this flag. Checks that ceph reports as muted, and checks"
+                    . " known to be harmless for a rolling restart, never block and are named"
+                    . " in the task log. The cluster-wide OSD map flags are only ever"
+                    . " evaluated for an OSD restart, since they govern nothing a mon, mgr or"
+                    . " mds restart touches. The operator is responsible for confirming the"
+                    . " cluster is stable enough to absorb a rolling restart.",
                 type => 'boolean',
                 optional => 1,
                 default => 0,
@@ -528,17 +536,28 @@ __PACKAGE__->register_method({
             # failures still slip through.
             $rados = PVE::Ceph::Services::ResilientRados->new(timeout => 60);
 
-            # Entry health check: HEALTH_ERR always blocks. HEALTH_WARN blocks unless
-            # every firing check is on a benign-for-rolling-restart allowlist, or the
-            # caller passed force=1. Skipped on dry-run so operators can still inspect
-            # a marginal cluster.
+            # Entry health check: HEALTH_ERR blockers always refuse, HEALTH_WARN blockers
+            # need force=1. Skipped on dry-run so operators can still inspect a marginal
+            # cluster.
             if (!$dry_run) {
-                my ($ok, $sev, $blockers) =
-                    PVE::Ceph::Services::check_health_acceptable($rados, $force);
+                my ($ok, $sev, $blockers, $ignored) =
+                    PVE::Ceph::Services::check_health_acceptable($rados, $force, $type);
+
+                # Printed before the refusal too: a cluster the GUI shows as HEALTH_ERR is
+                # exactly where an operator needs to know which errors were stepped over.
+                print "NOTE: not blocking on health check(s) considered safe for a rolling"
+                    . " restart, or muted by an operator:\n  - "
+                    . join("\n  - ", @$ignored) . "\n"
+                    if @$ignored;
                 if (!$ok) {
+                    die "could not evaluate ceph health, refusing rolling restart of"
+                        . " '$type' daemons:\n  - "
+                        . join("\n  - ", @$blockers) . "\n"
+                        if $sev eq 'HEALTH_FETCH_FAIL';
+
                     if ($sev eq 'HEALTH_ERR') {
-                        die "Ceph cluster is in HEALTH_ERR state, refusing rolling restart"
-                            . " of '$type' daemons:\n  - "
+                        die "Ceph cluster has blocking HEALTH_ERR issues, refusing rolling"
+                            . " restart of '$type' daemons (force cannot override those):\n  - "
                             . join("\n  - ", @$blockers) . "\n";
                     }
                     die "Ceph cluster has blocking HEALTH_WARN issues, refusing rolling"
@@ -642,13 +661,14 @@ __PACKAGE__->register_method({
                             my ($host, $count) = $osd_nodes[$i]->@*;
                             my $tag = "[" . ($i + 1) . "/$node_total]";
 
-                            # Re-check cluster health before each node (an unrelated
-                            # failure mid-run should abort the cluster orchestration
-                            # cleanly).
-                            my $h = $rados->mon_command({ prefix => 'health' });
-                            die "$tag Ceph cluster degraded to HEALTH_ERR mid-restart,"
-                                . " aborting\n"
-                                if $h && ($h->{status} // '') eq 'HEALTH_ERR';
+                            # Re-check health before each node (an unrelated failure
+                            # mid-run should abort the cluster orchestration cleanly).
+                            my $errors =
+                                PVE::Ceph::Services::get_blocking_health_errors($rados, $type);
+                            die "$tag Ceph reports a blocking HEALTH_ERR mid-restart,"
+                                . " aborting:\n  - "
+                                . join("\n  - ", @$errors) . "\n"
+                                if @$errors;
 
                             # Between nodes wait until ok-to-stop passes on a sample OSD; the
                             # previous node's restart leaves PGs re-peering which would otherwise
@@ -782,12 +802,14 @@ __PACKAGE__->register_method({
                             my $daemon = "$type.$name";
                             my $tag = "[$i/$total]";
 
-                            # Re-check cluster health every iteration so we abort if the cluster
-                            # degrades to HEALTH_ERR partway through (e.g. an unrelated OSD failure).
-                            my $h = $rados->mon_command({ prefix => 'health' });
-                            die
-                                "$tag Ceph cluster degraded to HEALTH_ERR mid-restart, aborting\n"
-                                if $h && ($h->{status} // '') eq 'HEALTH_ERR';
+                            # Re-check health every iteration so we abort if a blocking error
+                            # shows up partway through (e.g. an unrelated OSD failure).
+                            my $errors =
+                                PVE::Ceph::Services::get_blocking_health_errors($rados, $type);
+                            die "$tag Ceph reports a blocking HEALTH_ERR mid-restart,"
+                                . " aborting:\n  - "
+                                . join("\n  - ", @$errors) . "\n"
+                                if @$errors;
 
                             my ($safe, $msg) =
                                 PVE::Ceph::Services::is_safe_to_stop($rados, $type, $name);
@@ -1036,6 +1058,158 @@ __PACKAGE__->register_method({
             prefix => "osd $cmd",
             key => $param->{flag},
         });
+
+        return undef;
+    },
+});
+
+__PACKAGE__->register_method({
+    name => 'health_mute_index',
+    path => 'health-mute',
+    method => 'GET',
+    description => "Get the currently muted Ceph health checks.",
+    protected => 1,
+    permissions => {
+        check => ['perm', '/', ['Sys.Audit', 'Datastore.Audit'], any => 1],
+    },
+    parameters => {
+        additionalProperties => 0,
+        properties => {},
+    },
+    returns => {
+        type => 'array',
+        items => {
+            type => 'object',
+            properties => {
+                code => {
+                    description => "The muted health check.",
+                    type => 'string',
+                },
+                summary => {
+                    description => "What the check reports.",
+                    type => 'string',
+                    optional => 1,
+                },
+                ttl => {
+                    description => "When the mute expires. Absent if it does not.",
+                    type => 'string',
+                    optional => 1,
+                },
+                sticky => {
+                    description => "Whether the mute survives the check getting worse.",
+                    type => 'boolean',
+                },
+            },
+        },
+    },
+    code => sub {
+        my ($param) = @_;
+
+        PVE::Ceph::Tools::check_ceph_configured();
+
+        my $rados = PVE::RADOS->new();
+        # 'detail' would only add the per-check entity lists, which can be huge and are not
+        # used here; the mutes come with any json formatted health reply
+        my $health = $rados->mon_command({ prefix => 'health', format => 'json' });
+
+        my $res = [];
+        for my $mute ((ref($health->{mutes}) eq 'ARRAY' ? $health->{mutes} : [])->@*) {
+            next if !defined($mute->{code});
+            push @$res,
+                {
+                    code => $mute->{code},
+                    sticky => $mute->{sticky} ? 1 : 0,
+                    defined($mute->{summary}) ? (summary => $mute->{summary}) : (),
+                    defined($mute->{ttl}) ? (ttl => $mute->{ttl}) : (),
+                };
+        }
+
+        return $res;
+    },
+});
+
+my $CEPH_TTL_UNITS = join(
+    '|', qw(
+        s sec seconds? m min minutes? h hr hours? d days? w wk weeks? mo months? y yr years?
+    ),
+);
+
+__PACKAGE__->register_method({
+    name => 'health_mute',
+    path => 'health-mute/{code}',
+    method => 'PUT',
+    description => "Mute or unmute a Ceph health check. A muted check no longer counts towards"
+        . " the cluster status, but stays visible and keeps being evaluated.",
+    protected => 1,
+    permissions => {
+        check => ['perm', '/', ['Sys.Modify']],
+    },
+    parameters => {
+        additionalProperties => 0,
+        properties => {
+            code => {
+                description => "The health check to mute, as reported by 'ceph health', for"
+                    . " example 'AUTH_INSECURE_CLIENT_KEY_TYPE'.",
+                type => 'string',
+                pattern => '[A-Z][A-Z0-9_]+',
+                maxLength => 64,
+            },
+            value => {
+                description => "Whether to mute (true) or unmute (false) the check.",
+                type => 'boolean',
+            },
+            ttl => {
+                description => "How long the mute lasts, for example '2h', '3d' or '1w'."
+                    . " Without it the mute has no expiry. Only used when muting.",
+                type => 'string',
+                # Ceph accepts a sequence of amount and unit pairs, so '1d12h' and '1d 12h'
+                # are both valid. Spaces and tabs only, as '\s' would also let a newline
+                # through; the web interface trims the value before it gets here.
+                pattern => "\\d+[ \\t]*(?:${CEPH_TTL_UNITS})"
+                    . "(?:[ \\t]*\\d+[ \\t]*(?:${CEPH_TTL_UNITS}))*(?!\\n)",
+                optional => 1,
+            },
+            sticky => {
+                description => "Keep the mute even when the check gets worse. Without this a"
+                    . " mute clears itself as soon as the number of affected items grows,"
+                    . " which brings the check back to attention. Only used when muting.",
+                type => 'boolean',
+                optional => 1,
+                default => 0,
+            },
+        },
+    },
+    returns => { type => 'null' },
+    code => sub {
+        my ($param) = @_;
+
+        PVE::Ceph::Tools::check_ceph_configured();
+
+        my $rados = PVE::RADOS->new();
+
+        if (!$param->{value}) {
+            $rados->mon_command({ prefix => 'health unmute', code => $param->{code} });
+            return undef;
+        }
+
+        my $cmd = { prefix => 'health mute', code => $param->{code} };
+        $cmd->{ttl} = $param->{ttl} if defined($param->{ttl});
+        $cmd->{sticky} = JSON::true if $param->{sticky};
+
+        # Ceph refuses a check that is not currently raised, and a duration that works out to
+        # zero. Both are the caller's mistake rather than a server fault, so map the errno.
+        # mon_command drops it, hence mon_cmd with the raw-result flag.
+        my $res = $rados->mon_cmd($cmd, 1);
+        my $rc = $res->{return_code} // 0;
+        if ($rc == -2) {
+            raise_param_exc({
+                code => "cannot mute '$param->{code}', ceph does not currently report it",
+            });
+        } elsif ($rc == -22) {
+            raise_param_exc({ ttl => "not a usable duration" });
+        } elsif ($rc != 0) {
+            die "could not mute '$param->{code}': " . ($res->{status} // "error $rc") . "\n";
+        }
 
         return undef;
     },

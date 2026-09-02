@@ -1,8 +1,96 @@
 Ext.define('pve-ceph-warnings', {
     extend: 'Ext.data.Model',
-    fields: ['id', 'summary', 'detail', 'severity'],
+    fields: [
+        'id',
+        'summary',
+        'detail',
+        'severity',
+        'muted',
+        'canMute',
+        'muteValue',
+        'muteIcon',
+        'muteLabel',
+    ],
     idProperty: 'id',
 });
+
+// Ceph reports the same cipher change through several checks, with a detail that lists the
+// affected entities but not what to do about them. Keyed by the exact check, so the unrelated
+// AUTH_INSECURE_GLOBAL_ID_RECLAIM* checks keep ceph's own text.
+const CEPHX_CIPHER_LEAD = gettext(
+    'Ceph Squid 19.2.6 and Ceph Tentacle 20.2.4 report cephx keys that still use the old aes' +
+        ' cipher as insecure, until they are migrated to aes256k. Storage and the daemons keep' +
+        ' working in the meantime.',
+);
+
+const CEPHX_MIGRATE_SERVICE_KEYS = gettext(
+    'Run /usr/share/pve-manager/migrations/pve-cephx-rotate-service-keys on one node to see' +
+        ' what it would do, then again with --apply to migrate the manager, metadata server' +
+        ' and OSD keys, which clears this.',
+);
+
+const CEPHX_CIPHER_HOWTO = {
+    AUTH_INSECURE_SERVICE_KEY_TYPE: CEPHX_MIGRATE_SERVICE_KEYS,
+    AUTH_INSECURE_SERVICE_TICKETS: CEPHX_MIGRATE_SERVICE_KEYS,
+    AUTH_INSECURE_CLIENT_KEY_TYPE: gettext(
+        'Client keys only move when asked for. Pass --rotate-client-keys to the migration' +
+            ' script for the keys that only Ceph reads, which needs no particular kernel.' +
+            ' --rotate-admin-key and --rotate-storage-key NAME cover the keys a storage uses,' +
+            ' and an in-kernel RBD or CephFS client needs kernel 7.0 or newer to read those' +
+            ' once they move. A key an encrypted OSD created before the upgrade uses cannot' +
+            ' move at all, and then muting this check is the way out.',
+    ),
+    AUTH_INSECURE_KEYS_ALLOWED: gettext(
+        'The monitors have to keep accepting the old cipher while any key still uses it. This' +
+            ' clears once every service and client key is migrated and the old cipher is' +
+            ' dropped from auth_allowed_ciphers, which the documentation covers.',
+    ),
+    AUTH_INSECURE_KEYS_CREATABLE: gettext(
+        'The monitors still create keys with the old cipher, which they do as long as they' +
+            ' accept it. Set mon_auth_allow_insecure_key to false to clear this on its own,' +
+            ' once nothing needs a key that older kernel clients can read.',
+    ),
+    AUTH_INSECURE_ROTATING_SERVICE_KEY_TYPE: gettext(
+        'The monitors build these from the cipher they hand out service tickets with, so this' +
+            ' clears on its own about three hours after that switched over, which the last' +
+            ' step of the migration does.',
+    ),
+};
+
+// The Mute/Unmute button lives in the detail of the row that reports the check, which is
+// template markup rather than a component, so the grid catches its events and the check is
+// read back off the button.
+let cephHealthMuteAction = function (target) {
+    let code = target.getAttribute('data-code');
+    let panel = Ext.Component.from(target)?.up('pveNodeCephStatus');
+    let reload = () => panel?.store.load();
+
+    if (target.getAttribute('data-mute') === '1') {
+        Ext.create('PVE.ceph.HealthMute', {
+            code: code,
+            autoShow: true,
+            listeners: { close: reload },
+        });
+        return;
+    }
+
+    Ext.Msg.confirm(
+        gettext('Confirm'),
+        Ext.String.format(gettext("Unmute health check '{0}'?"), code),
+        function (btn) {
+            if (btn !== 'yes') {
+                return;
+            }
+            Proxmox.Utils.API2Request({
+                url: `/cluster/ceph/health-mute/${code}`,
+                method: 'PUT',
+                params: { value: 0 },
+                failure: (response) => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
+                success: reload,
+            });
+        },
+    );
+};
 
 Ext.define('PVE.node.CephStatus', {
     extend: 'Ext.panel.Panel',
@@ -83,6 +171,14 @@ Ext.define('PVE.node.CephStatus', {
                     viewConfig: {
                         enableTextSelection: true,
                         listeners: {
+                            // The button sits in the row body, which is template markup rather
+                            // than a component, so the view catches its clicks and the check is
+                            // read back off the button.
+                            click: {
+                                element: 'el',
+                                delegate: '.pve-ceph-warning-action',
+                                fn: (e, target) => cephHealthMuteAction(target),
+                            },
                             collapsebody: function (rowNode, record) {
                                 record.set('expanded', false);
                                 record.commit();
@@ -106,6 +202,9 @@ Ext.define('PVE.node.CephStatus', {
                     },
                     updateHealth: function (health) {
                         let checks = health.checks || {};
+                        // muting needs Sys.Modify, while this panel only needs an audit
+                        // privilege, so an audit user must not be offered the action
+                        let canMute = !!Ext.state.Manager.get('GuiCap')?.dc['Sys.Modify'];
 
                         let checkRecords = Object.keys(checks)
                             .sort()
@@ -118,7 +217,19 @@ Ext.define('PVE.node.CephStatus', {
                                         .reduce((acc, v) => `${acc}\n${v.message}`, '')
                                         .trimStart(),
                                     severity: check.severity,
+                                    muted: !!check.muted,
+                                    canMute: canMute,
                                 };
+                                data.muteValue = data.muted ? 0 : 1;
+                                data.muteIcon = data.muted ? 'fa-bell' : 'fa-bell-slash';
+                                data.muteLabel = data.muted ? gettext('Unmute') : gettext('Mute');
+                                let howto = CEPHX_CIPHER_HOWTO[key];
+                                if (howto) {
+                                    // ahead of ceph's own detail, which would push this out of view
+                                    data.detail =
+                                        `${CEPHX_CIPHER_LEAD} ${howto}` +
+                                        (data.detail ? `\n\n${data.detail}` : '');
+                                }
                                 data.noDetails = data.detail.length === 0;
                                 data.detailsCls = data.detail.length === 0 ? 'pmx-opacity-75' : '';
                                 if (data.detail.length === 0) {
@@ -138,7 +249,13 @@ Ext.define('PVE.node.CephStatus', {
                             tooltip: gettext('Severity'),
                             align: 'center',
                             width: 38,
-                            renderer: function (value) {
+                            renderer: function (value, metaData, record) {
+                                if (record.get('muted')) {
+                                    metaData.tdAttr = `data-qtip="${Ext.String.htmlEncode(
+                                        gettext('Muted in Ceph, ignored for the overall status'),
+                                    )}"`;
+                                    return '<i class="fa fa-fw faded fa-bell-slash"></i>';
+                                }
                                 let health = PVE.Utils.map_ceph_health[value];
                                 let icon = PVE.Utils.get_health_icon(health);
                                 return `<i class="fa fa-fw ${icon}"></i>`;
@@ -159,6 +276,9 @@ Ext.define('PVE.node.CephStatus', {
                             renderer: function (value, metaData, record, rI, cI, store, view) {
                                 if (record.get('expanded')) {
                                     metaData.tdCls = 'pmx-column-wrapped';
+                                }
+                                if (record.get('muted')) {
+                                    metaData.tdCls += ' pmx-opacity-75';
                                 }
                                 return Ext.htmlEncode(value);
                             },
@@ -212,6 +332,22 @@ Ext.define('PVE.node.CephStatus', {
                                 '<pre class="pve-ceph-warning-detail {detailsCls}">',
                                 '{detail:htmlEncode}',
                                 '</pre>',
+                                '<tpl if="canMute">',
+                                '<div class="pve-ceph-warning-actions">',
+                                // ExtJS' own button markup, so that both themes style it
+                                '<a class="x-btn x-unselectable x-btn-default-toolbar-small',
+                                ' pve-ceph-warning-action" role="button"',
+                                ' data-code="{id:htmlEncode}" data-mute="{muteValue}">',
+                                '<span class="x-btn-wrap x-btn-wrap-default-toolbar-small">',
+                                '<span class="x-btn-button x-btn-button-default-toolbar-small',
+                                ' x-btn-button-center x-btn-text x-btn-icon x-btn-icon-left">',
+                                '<span class="x-btn-icon-el x-btn-icon-el-default-toolbar-small',
+                                ' fa {muteIcon}"></span>',
+                                '<span class="x-btn-inner x-btn-inner-default-toolbar-small">',
+                                '{muteLabel:htmlEncode}',
+                                '</span></span></span></a>',
+                                '</div>',
+                                '</tpl>',
                             ],
                         },
                     ],
