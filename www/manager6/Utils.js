@@ -1313,19 +1313,12 @@ Ext.define('PVE.Utils', {
             return Ext.htmlEncode(Proxmox.Utils.format_task_description(type, id));
         },
 
-        render_optional_url: function (value) {
-            if (value && value.match(/^https?:\/\//)) {
-                return '<a target="_blank" href="' + value + '">' + value + '</a>';
-            }
-            return value;
-        },
-
         render_san: function (value) {
             var names = [];
             if (Ext.isArray(value)) {
                 value.forEach(function (val) {
                     if (!Ext.isNumber(val)) {
-                        names.push(val);
+                        names.push(Ext.htmlEncode(val));
                     }
                 });
                 return names.join('<br>');
